@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 构建产物
+build/
+dist/
+*.spec.bak
+
+# 模型与训练产物（可再生成，不入库）
+model/
+cachedir/
+catboost_info_red/
+catboost_info_blue/
+
+# 运行时产物
+logs/
+*.log
+
+# Agent 工具运行时状态（易变，不入库）
+.swarm/session/
+.swarm/evidence/
+.swarm/runs/
+.swarm/knowledge-events.jsonl
+.swarm/repo-graph.json
+.swarm/locks/
+.swarm/summaries/
+.swarm/telemetry.jsonl
