@@ -281,14 +281,21 @@ class BacktestThread(QThread):
         try:
             # 延迟 import：backtest 模块内部避免加载 scripts/data_analysis
             # （其 PyQt5 依赖与 torch 的 DLL 初始化冲突，见 pyqt5-torch-dll-conflict）
+            import io
+            import contextlib
             from backtest import run_backtest
-            report = run_backtest(
-                self.lottery_type,
-                self.model_type,
-                periods=self.periods,
-                seed=self.seed,
-                log_callback=lambda msg: self.log_signal.emit(msg),
-            )
+            # 重定向 stdout/stderr：ml_models 内部打印的模型信息与
+            # sklearn joblib 的 [Parallel] 进度会刷爆终端，回测只保留
+            # 经 log_callback 转发的进度日志
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                report = run_backtest(
+                    self.lottery_type,
+                    self.model_type,
+                    periods=self.periods,
+                    seed=self.seed,
+                    log_callback=lambda msg: self.log_signal.emit(msg),
+                )
             self.report = report
             self.finished_signal.emit(report is not None)
         except Exception as e:

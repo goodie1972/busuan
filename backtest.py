@@ -251,8 +251,9 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
             'prize_name': prize_name,
             'prize_amount': amount,
         })
-        if (idx + 1) % 100 == 0 or (idx + 1) == n_total:
-            log(f"进度: {idx + 1}/{n_total} 期")
+        if (idx + 1) % 50 == 0 or (idx + 1) == n_total:
+            pct = 100.0 * (idx + 1) / n_total
+            log(f"回测进度: {idx + 1}/{n_total} 期 ({pct:.0f}%)")
 
     if not results:
         log("错误: 没有任何一期预测成功")

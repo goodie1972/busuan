@@ -625,7 +625,21 @@ class LotteryPredictorApp(QMainWindow):
         self.backtest_thread.start()
     
     def on_backtest_log(self, message):
-        """回测过程日志转发到主日志框"""
+        """回测过程日志：实时显示在回测tab结果区，并转发到主日志框"""
+        # 实时显示在回测tab（用户当前所在位置）
+        self.bt_result_text.append(message)
+        # 同步进度到状态栏
+        if "进度" in message and "期" in message:
+            self.bt_status_label.setText(message)
+        # 限制结果区行数，防止日志过多拖慢界面
+        doc = self.bt_result_text.document()
+        if doc.blockCount() > 3000:
+            cursor = self.bt_result_text.textCursor()
+            cursor.movePosition(QtGui.QTextCursor.Start)
+            cursor.movePosition(QtGui.QTextCursor.Down,
+                                QtGui.QTextCursor.KeepAnchor, 1500)
+            cursor.removeSelectedText()
+        # 转发主日志框
         self.log_emitter.new_log.emit(message)
     
     def on_backtest_finished(self, success):
@@ -634,7 +648,8 @@ class LotteryPredictorApp(QMainWindow):
         if success and self.backtest_thread and self.backtest_thread.report:
             try:
                 from backtest import format_summary_text
-                self.bt_result_text.setPlainText(
+                # 追加摘要，保留前面的进度日志
+                self.bt_result_text.append("\n" +
                     format_summary_text(self.backtest_thread.report))
             except Exception as e:
                 self.bt_result_text.append(f"\n[生成摘要失败: {e}]")
