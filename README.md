@@ -237,4 +237,5 @@ LottoProphet/
    python main.py predict ssq --model lightgbm  # 使用LightGBM模型预测双色球
    python main.py backtest ssq --model ensemble  # 历史数据回测(与随机基线对比)
    python main.py backtest dlt --model lightgbm --periods 500  # 仅回测最近500期
+   python main.py records  # 核验预测记录(每次GUI生成预测自动存档，比对真实开奖)
    ```

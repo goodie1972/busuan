@@ -230,7 +230,7 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
         # 用截至 t-1 期的最近 feature_window 期做特征，预测第 t 期
         hist = df.iloc[max(0, t - feature_window):t]
         try:
-            pred_red, pred_blue = model_obj.predict(hist)
+            pred_red, pred_blue, confidence = model_obj.predict_with_confidence(hist)
         except Exception as e:
             log(f"第 {t + 1} 期(期数 {df.iloc[t]['期数']})预测出错: {e}")
             continue
@@ -250,6 +250,7 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
             'blue_hits': blue_hits,
             'prize_name': prize_name,
             'prize_amount': amount,
+            'confidence': confidence,  # {'red','blue','overall'} 或 None
         })
         if (idx + 1) % 50 == 0 or (idx + 1) == n_total:
             pct = 100.0 * (idx + 1) / n_total
@@ -278,6 +279,39 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
     # 随机基线（用最后一期真实号码）
     last_red, last_blue = _numbers_from_row(df.iloc[end], red_cols, blue_cols)
     baseline = _random_baseline(lottery_type, last_red, last_blue, seed=seed)
+
+    # 校准分析：检验"高置信度是否真的更准"。
+    # 多分类概率均值天然偏低(红球33类、蓝球16类)，等距桶无区分度，
+    # 因此按 overall 置信度升序分 低/中/高 三组（每组期数≈1/3）对比命中率。
+    valid_conf = [r for r in results if r['confidence']]
+    quantile_cal = []
+    if valid_conf:
+        sorted_valid = sorted(valid_conf, key=lambda r: r['confidence']['overall'])
+        n = len(sorted_valid)
+        third = max(1, n // 3)
+        chunks = [
+            ('低置信度', sorted_valid[:third]),
+            ('中置信度', sorted_valid[third:2 * third]),
+            ('高置信度', sorted_valid[2 * third:]),
+        ]
+        for name, chunk in chunks:
+            if not chunk:
+                continue
+            qn = len(chunk)
+            qw = sum(1 for r in chunk if r['prize_name'] is not None)
+            avg_c = float(np.mean([r['confidence']['overall'] for r in chunk]))
+            quantile_cal.append({
+                'group': name,
+                'count': qn,
+                'any_prize': qw,
+                'any_prize_rate': round(qw / qn, 6),
+                'avg_confidence': round(avg_c, 4),
+            })
+    no_conf = sum(1 for r in results if not r['confidence'])
+    calibration = {
+        'quantile': quantile_cal,
+        'no_confidence_count': no_conf,
+    }
 
     report = {
         'meta': {
@@ -309,6 +343,7 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
             'prize_counts': prize_counts,
         },
         'random_baseline': baseline,
+        'calibration': calibration,
         'comparison': {
             'any_prize_rate': {
                 'model': round(any_prize / n, 6),
@@ -387,6 +422,26 @@ def format_summary_text(report):
                  f"成本: {meta['cost_per_bet']:.0f} 元")
     lines.append(f"  模型任意奖命中率 {cmp_['any_prize_rate']['model'] * 100:.2f}%  vs  "
                  f"随机 {cmp_['any_prize_rate']['random'] * 100:.2f}%")
+    lines.append("")
+    cal = report.get('calibration')
+    if cal and cal.get('quantile'):
+        qcal = cal['quantile']
+        lines.append("置信度校准分析 (按置信度分 低/中/高 三组，各含约1/3期数):")
+        for b in qcal:
+            lines.append(f"  {b['group']} (均{b['avg_confidence']:.3f}): {b['count']:4d} 期  "
+                         f"中奖 {b['any_prize']:2d} 期  命中率 {b['any_prize_rate'] * 100:5.2f}%")
+        if len(qcal) >= 2:
+            lo = qcal[0]['any_prize_rate']
+            hi = qcal[-1]['any_prize_rate']
+            gap = (hi - lo) * 100
+            if gap > 3:
+                lines.append(f"  高 vs 低 命中率差 +{gap:.2f}%：置信度有一定信息量")
+            elif gap < -3:
+                lines.append(f"  高 vs 低 命中率差 {gap:.2f}%：置信度与命中率倒挂")
+            else:
+                lines.append(f"  高 vs 低 命中率差 {gap:+.2f}%：置信度基本无区分度")
+        if cal.get('no_confidence_count'):
+            lines.append(f"  (另有 {cal['no_confidence_count']} 期无置信度)")
     lines.append("")
     lines.append("注意: 回测存在训练集泄漏，结果偏乐观；彩票为独立随机事件，长期期望为负")
     lines.append("=" * 46)

@@ -135,9 +135,60 @@ class WrappedCatBoostModel:
         raw_preds = self.model.predict(data)
         return self.process_prediction(raw_preds)
 
+def _class_proba_dict(model, X_scaled):
+    """获取模型对单样本的逐类概率 dict {类别索引(号码-1): 概率}；无概率信息时返回 None"""
+    try:
+        # sklearn 系分类器：classes_ + predict_proba（概率列顺序=classes_）
+        classes = getattr(model, 'classes_', None)
+        if classes is not None and hasattr(model, 'predict_proba'):
+            row = np.asarray(model.predict_proba(X_scaled))
+            if row.ndim == 2:
+                row = row[0]
+                return {int(c): float(row[i]) for i, c in enumerate(classes) if i < len(row)}
+        # xgboost Booster（无 classes_）：multi:softmax 下 predict 直接返回概率矩阵
+        if 'Booster' in type(model).__name__:
+            try:
+                import xgboost as xgb
+                row = np.asarray(model.predict(xgb.DMatrix(X_scaled)))
+            except Exception:
+                row = np.asarray(model.predict(X_scaled))
+            if row.ndim == 2:
+                row = row[0]
+                return {i: float(row[i]) for i in range(len(row))}
+    except Exception:
+        pass
+    return None
+
+
+def _ensemble_proba_dict(models_dict, X_scaled):
+    """集成模型：对每个子模型取逐类概率并平均，返回 {类别索引: 平均概率}"""
+    sums = None
+    count = 0
+    for model in models_dict.values():
+        d = _class_proba_dict(model, X_scaled)
+        if d:
+            if sums is None:
+                sums = dict(d)
+            else:
+                for k, v in d.items():
+                    sums[k] = sums.get(k, 0.0) + v
+            count += 1
+    if sums is None or count == 0:
+        return None
+    return {k: v / count for k, v in sums.items()}
+
+
+def _mean_confidence(proba_map, numbers):
+    """所选号码的模型概率均值（号码=类别索引+1；未出现的类别按0计）"""
+    if not proba_map:
+        return None
+    vals = [proba_map.get(int(num) - 1, 0.0) for num in numbers]
+    return float(np.mean(vals)) if vals else None
+
+
 class LotteryMLModels:
     """彩票预测机器学习模型类"""
-    
+
     def __init__(self, lottery_type='dlt', model_type='ensemble', feature_window=10, log_callback=None, use_gpu=False):
         """
         初始化模型
@@ -1354,6 +1405,10 @@ class LotteryMLModels:
         Returns:
             预测的红球和蓝球号码
         """
+        # 每次预测前清空置信度，仅在主预测路径末尾填充
+        self.last_confidence = None
+        self.last_red_conf = None
+        self.last_blue_conf = None
         # 检查是否使用期望值模型
         if self.model_type == 'expected_value' and EXPECTED_VALUE_MODEL_AVAILABLE:
             # 检查模型是否已经加载
@@ -1553,6 +1608,16 @@ class LotteryMLModels:
                 else:
                     red_predictions = [int(red_pred) + 1]  # +1 转回原始号码范围
             
+            # 计算红球置信度（所选红球号码的模型概率均值）
+            try:
+                if self.model_type == 'ensemble':
+                    proba_map = _ensemble_proba_dict(self.models['red'], X_scaled)
+                else:
+                    proba_map = _class_proba_dict(self.models['red'], X_scaled)
+                self.last_red_conf = _mean_confidence(proba_map, red_predictions)
+            except Exception:
+                self.last_red_conf = None
+            
             # 预测蓝球
             if self.model_type == 'ensemble':
                 # 集成模型：self.models['blue'] 是各子模型的 dict，逐模型预测后投票
@@ -1602,6 +1667,16 @@ class LotteryMLModels:
                         blue_predictions = [np.random.randint(1, blue_range + 1)]
                     else:
                         blue_predictions = [int(blue_pred) + 1]  # +1 转回原始号码范围
+            
+            # 计算蓝球置信度（所选蓝球号码的模型概率均值）
+            try:
+                if self.model_type == 'ensemble':
+                    proba_map = _ensemble_proba_dict(self.models['blue'], X_scaled)
+                else:
+                    proba_map = _class_proba_dict(self.models['blue'], X_scaled)
+                self.last_blue_conf = _mean_confidence(proba_map, blue_predictions)
+            except Exception:
+                self.last_blue_conf = None
         except Exception as e:
             self.log(f"预测过程中出错: {e}")
             import traceback
@@ -1641,8 +1716,34 @@ class LotteryMLModels:
                 if new_num not in blue_predictions:
                     blue_predictions.append(new_num)
             blue_predictions = sorted(blue_predictions)[:self.blue_count]
+            # 随机号码没有模型依据，置信度记为 0
+            self.last_blue_conf = 0.0
+        
+        # 组装整体置信度：按号码个数加权红/蓝
+        if self.last_red_conf is not None or self.last_blue_conf is not None:
+            red_c = self.last_red_conf if self.last_red_conf is not None else 0.0
+            blue_c = self.last_blue_conf if self.last_blue_conf is not None else 0.0
+            total = self.red_count + self.blue_count
+            self.last_confidence = {
+                'red': red_c,
+                'blue': blue_c,
+                'overall': (red_c * self.red_count + blue_c * self.blue_count) / total,
+            }
         
         return red_predictions, blue_predictions
+
+    def predict_with_confidence(self, recent_data):
+        """
+        生成预测并附带置信度（所选号码的模型概率均值）。
+        
+        Returns:
+            (red_numbers, blue_numbers, confidence) 或 (None, None, None)
+            confidence: {'red': float, 'blue': float, 'overall': float} 或 None
+        """
+        result = self.predict(recent_data)
+        if result is None or result[0] is None:
+            return None, None, None
+        return result[0], result[1], getattr(self, 'last_confidence', None)
 
 # 使用示例
 def demo():
