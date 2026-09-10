@@ -339,8 +339,8 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
     return report
 
 
-def _print_summary(report, log):
-    """打印回测摘要到控制台"""
+def format_summary_text(report):
+    """生成回测摘要文本（GUI 与命令行共用）"""
     meta = report['meta']
     per = report['periods']
     pnl = report['pnl']
@@ -348,47 +348,54 @@ def _print_summary(report, log):
     rb = report['random_baseline']
     cmp_ = report['comparison']
 
-    log("")
-    log("=" * 46)
-    log("回测报告摘要")
-    log("=" * 46)
-    log(f"彩票: {meta['lottery_name']}  模型: {meta['model_type']}  "
-        f"特征窗口: {meta['feature_window']}期")
-    log(f"回测期数: {per['backtested']} 期  "
-        f"({per['start_period']} ~ {per['end_period']})")
-    log(f"投注成本: {pnl['cost_total']:.0f} 元  "
-        f"奖金(固定奖): {pnl['prize_total_fixed']:.0f} 元  "
-        f"净收益: {pnl['net']:.0f} 元  ROI: {pnl['roi']:.2f}%")
-    log("")
-    log("红球命中分布:")
+    lines = []
+    lines.append("=" * 46)
+    lines.append("回测报告摘要")
+    lines.append("=" * 46)
+    lines.append(f"彩票: {meta['lottery_name']}  模型: {meta['model_type']}  "
+                 f"特征窗口: {meta['feature_window']}期")
+    lines.append(f"回测期数: {per['backtested']} 期  "
+                 f"({per['start_period']} ~ {per['end_period']})")
+    lines.append(f"投注成本: {pnl['cost_total']:.0f} 元  "
+                 f"奖金(固定奖): {pnl['prize_total_fixed']:.0f} 元  "
+                 f"净收益: {pnl['net']:.0f} 元  ROI: {pnl['roi']:.2f}%")
+    lines.append("")
+    lines.append("红球命中分布:")
     for k in sorted(mp['red_hit_distribution'], key=int):
         v = mp['red_hit_distribution'][k]
         bar = '#' * int(v / max(1, per['backtested']) * 50)
-        log(f"  命中{k}个红球: {v:5d} 期  {bar}")
-    log("蓝球命中分布:")
+        lines.append(f"  命中{k}个红球: {v:5d} 期  {bar}")
+    lines.append("蓝球命中分布:")
     for k in sorted(mp['blue_hit_distribution'], key=int):
         v = mp['blue_hit_distribution'][k]
         bar = '#' * int(v / max(1, per['backtested']) * 50)
-        log(f"  命中{k}个蓝球: {v:5d} 期  {bar}")
-    log(f"任意奖命中率: {mp['any_prize_rate'] * 100:.2f}%")
+        lines.append(f"  命中{k}个蓝球: {v:5d} 期  {bar}")
+    lines.append(f"任意奖命中率: {mp['any_prize_rate'] * 100:.2f}%")
     if mp['prize_counts']:
-        log("奖级分布: " + ", ".join(f"{k} {v}次" for k, v in mp['prize_counts'].items()))
+        lines.append("奖级分布: " + ", ".join(f"{k} {v}次" for k, v in mp['prize_counts'].items()))
     else:
-        log("奖级分布: 未中任何奖级")
-    log("")
-    log("随机选号基线 ({} 注蒙特卡洛模拟):".format(rb['simulations']))
-    log(f"  任意奖命中率: {rb['any_prize_rate'] * 100:.2f}%")
-    log(f"  每注期望奖金(固定奖): {rb['expected_prize_per_bet']:.4f} 元")
-    log("")
-    log("对比 (每注期望，均不含浮动奖):")
-    log(f"  模型: {cmp_['expected_prize_per_bet']['model']:.4f} 元  "
-        f"随机: {cmp_['expected_prize_per_bet']['random']:.4f} 元  "
-        f"成本: {meta['cost_per_bet']:.0f} 元")
-    log(f"  模型任意奖命中率 {cmp_['any_prize_rate']['model'] * 100:.2f}%  vs  "
-        f"随机 {cmp_['any_prize_rate']['random'] * 100:.2f}%")
-    log("")
-    log("注意: 回测存在训练集泄漏，结果偏乐观；彩票为独立随机事件，长期期望为负")
-    log("=" * 46)
+        lines.append("奖级分布: 未中任何奖级")
+    lines.append("")
+    lines.append(f"随机选号基线 ({rb['simulations']} 注蒙特卡洛模拟):")
+    lines.append(f"  任意奖命中率: {rb['any_prize_rate'] * 100:.2f}%")
+    lines.append(f"  每注期望奖金(固定奖): {rb['expected_prize_per_bet']:.4f} 元")
+    lines.append("")
+    lines.append("对比 (每注期望，均不含浮动奖):")
+    lines.append(f"  模型: {cmp_['expected_prize_per_bet']['model']:.4f} 元  "
+                 f"随机: {cmp_['expected_prize_per_bet']['random']:.4f} 元  "
+                 f"成本: {meta['cost_per_bet']:.0f} 元")
+    lines.append(f"  模型任意奖命中率 {cmp_['any_prize_rate']['model'] * 100:.2f}%  vs  "
+                 f"随机 {cmp_['any_prize_rate']['random'] * 100:.2f}%")
+    lines.append("")
+    lines.append("注意: 回测存在训练集泄漏，结果偏乐观；彩票为独立随机事件，长期期望为负")
+    lines.append("=" * 46)
+    return "\n".join(lines)
+
+
+def _print_summary(report, log):
+    """打印回测摘要到控制台"""
+    for line in format_summary_text(report).splitlines():
+        log(line)
 
 
 def main():

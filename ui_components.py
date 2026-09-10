@@ -431,6 +431,98 @@ def create_expected_value_tab(expected_value_tab):
             result_label, log_text)
 
 
+# 回测可用模型类型（显示名 -> 模型标识）
+BACKTEST_MODEL_ITEMS = [
+    ("集成模型", "ensemble"),
+    ("GBDT", "gbdt"),
+    ("LightGBM", "lightgbm"),
+    ("XGBoost", "xgboost"),
+    ("随机森林", "random_forest"),
+    ("CatBoost", "catboost"),
+]
+
+
+def create_backtest_tab(backtest_tab):
+    """
+    创建历史回测标签页的UI组件
+
+    Args:
+        backtest_tab: QWidget，历史回测标签页容器
+
+    Returns:
+        tuple: (start_button, lottery_combo, model_combo, periods_spin,
+                result_text, status_label)
+    """
+    bt_layout = QVBoxLayout(backtest_tab)
+    bt_layout.setSpacing(10)
+    bt_layout.setContentsMargins(8, 8, 8, 8)
+
+    # 创建标题
+    title_label = QLabel("历史回测")
+    title_label.setAlignment(Qt.AlignCenter)
+    title_label.setStyleSheet("font-size: 16pt; font-weight: bold; margin-bottom: 10px;")
+    bt_layout.addWidget(title_label)
+
+    # 创建设置区域
+    settings_group = QGroupBox("回测设置")
+    settings_layout = QFormLayout(settings_group)
+
+    # 彩票类型选择
+    lottery_combo = QComboBox()
+    lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
+    settings_layout.addRow("彩票类型:", lottery_combo)
+
+    # 模型类型选择
+    model_combo = QComboBox()
+    for display, value in BACKTEST_MODEL_ITEMS:
+        model_combo.addItem(display, value)
+    settings_layout.addRow("模型类型:", model_combo)
+
+    # 回测期数（0 = 全部历史）
+    periods_spin = QSpinBox()
+    periods_spin.setRange(0, 10000)
+    periods_spin.setValue(0)
+    periods_spin.setSpecialValueText("全部历史")
+    periods_spin.setSuffix(" 期")
+    settings_layout.addRow("回测期数:", periods_spin)
+
+    bt_layout.addWidget(settings_group)
+
+    # 控制按钮与状态
+    control_layout = QHBoxLayout()
+    start_button = QPushButton("开始回测")
+    start_button.setMinimumHeight(32)
+    start_button.setStyleSheet("font-weight: bold;")
+    status_label = QLabel("就绪")
+    status_label.setStyleSheet("color: #666666;")
+    control_layout.addWidget(start_button)
+    control_layout.addWidget(status_label, 1)
+    bt_layout.addLayout(control_layout)
+
+    # 结果显示区域
+    results_group = QGroupBox("回测结果")
+    results_layout = QVBoxLayout(results_group)
+    result_text = QTextEdit()
+    result_text.setReadOnly(True)
+    result_text.setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;")
+    results_layout.addWidget(result_text)
+    bt_layout.addWidget(results_group, 1)
+
+    # 说明文本
+    info_label = QLabel(
+        "回测使用逐期滚动方式：每期只用截至当期之前的历史数据预测下一期，并与实际开奖对比。"
+        "内置 10 万注随机选号蒙特卡洛基线作为参照，可客观判断模型是否优于随机选号。"
+        "注意：模型训练时见过全部历史数据，回测结果偏乐观，请作为相对评估而非对未来收益的承诺；"
+        "彩票为独立随机事件，长期期望收益为负。"
+    )
+    info_label.setWordWrap(True)
+    info_label.setStyleSheet("font-style: italic; color: #666666; margin-top: 5px;")
+    bt_layout.addWidget(info_label)
+
+    return (start_button, lottery_combo, model_combo, periods_spin,
+            result_text, status_label)
+
+
 def create_main_window():
     """
     创建主窗口实例

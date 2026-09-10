@@ -28,7 +28,7 @@ from ml_models import (
     LotteryMLModels, MODEL_TYPES
 )
 from thread_utils import (
-    TrainModelThread, UpdateDataThread, LogEmitter
+    TrainModelThread, UpdateDataThread, LogEmitter, BacktestThread
 )
 from prediction_utils import (
     process_predictions, randomize_numbers
@@ -36,7 +36,7 @@ from prediction_utils import (
 from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
-    create_expected_value_tab
+    create_expected_value_tab, create_backtest_tab
 )
 from data_processing import (
     process_analysis_data, get_trend_features, prepare_recent_trend_data,
@@ -157,11 +157,22 @@ class LotteryPredictorApp(QMainWindow):
         self.run_distribution_analysis_button.clicked.connect(self.run_distribution_analysis)
         self.show_stats_data_button.clicked.connect(self.show_statistics_data)
         
+        # 创建历史回测标签页
+        self.backtest_tab = QWidget()
+        self.bt_start_button, self.bt_lottery_combo, self.bt_model_combo, \
+        self.bt_periods_spin, self.bt_result_text, self.bt_status_label = \
+            create_backtest_tab(self.backtest_tab)
+        
+        # 连接信号和槽
+        self.bt_start_button.clicked.connect(self.start_backtest)
+        self.backtest_thread = None
+        
         # 添加标签页 - 注意顺序调整：预测放在第一个，期望值放在第二个
         self.tab_widget.addTab(self.main_tab, "预测")
         self.tab_widget.addTab(self.expectedvalue_tab, "期望值模型")
         self.tab_widget.addTab(self.analysis_tab, "数据分析")
         self.tab_widget.addTab(self.advanced_stats_tab, "高级统计")
+        self.tab_widget.addTab(self.backtest_tab, "历史回测")
         
         self.setCentralWidget(self.tab_widget)
         
@@ -572,6 +583,11 @@ class LotteryPredictorApp(QMainWindow):
             self.update_thread.terminate()
             self.update_thread.wait()
         
+        if self.backtest_thread and self.backtest_thread.isRunning():
+            logging.info("停止回测线程")
+            self.backtest_thread.terminate()
+            self.backtest_thread.wait()
+        
         # 关闭统计窗口
         if self.stats_window is not None and self.stats_window.isVisible():
             logging.info("关闭统计窗口")
@@ -584,6 +600,48 @@ class LotteryPredictorApp(QMainWindow):
                 handler.close()
         except Exception as e:
             print(f"清理资源时出错: {e}")
+
+    def start_backtest(self):
+        """开始历史回测"""
+        if self.backtest_thread and self.backtest_thread.isRunning():
+            self.bt_status_label.setText("回测正在进行中，请等待...")
+            return
+        
+        # 从控件读取参数
+        lottery_index = self.bt_lottery_combo.currentIndex()
+        lottery_keys = list(name_path.keys())
+        lottery_type = lottery_keys[lottery_index]
+        model_type = self.bt_model_combo.currentData()
+        periods = self.bt_periods_spin.value() or None
+        
+        self.bt_status_label.setText("回测运行中...")
+        self.bt_start_button.setEnabled(False)
+        self.bt_result_text.setPlainText("正在回测，请稍候...（完整历史回测可能需要数分钟）")
+        
+        # 创建并启动回测线程
+        self.backtest_thread = BacktestThread(lottery_type, model_type, periods=periods)
+        self.backtest_thread.log_signal.connect(self.on_backtest_log)
+        self.backtest_thread.finished_signal.connect(self.on_backtest_finished)
+        self.backtest_thread.start()
+    
+    def on_backtest_log(self, message):
+        """回测过程日志转发到主日志框"""
+        self.log_emitter.new_log.emit(message)
+    
+    def on_backtest_finished(self, success):
+        """回测完成，展示摘要"""
+        self.bt_start_button.setEnabled(True)
+        if success and self.backtest_thread and self.backtest_thread.report:
+            try:
+                from backtest import format_summary_text
+                self.bt_result_text.setPlainText(
+                    format_summary_text(self.backtest_thread.report))
+            except Exception as e:
+                self.bt_result_text.append(f"\n[生成摘要失败: {e}]")
+            self.bt_status_label.setText("回测完成")
+        else:
+            self.bt_result_text.append("\n[回测失败，详见日志]")
+            self.bt_status_label.setText("回测失败")
 
     def show_advanced_statistics(self):
         """显示高级统计分析结果"""

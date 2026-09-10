@@ -18,6 +18,9 @@ catboost_info_blue/
 logs/
 *.log
 
+# 回测报告（每次回测动态生成，不入库）
+backtest/*.json
+
 # Agent 工具运行时状态（易变，不入库）
 .swarm/session/
 .swarm/evidence/

@@ -260,4 +260,42 @@ class UpdateDataThread(QThread):
         except Exception as e:
             self.log_signal.emit(f"更新数据时出错: {str(e)}")
         finally:
-            self.finished_signal.emit() 
+            self.finished_signal.emit()
+
+
+class BacktestThread(QThread):
+    """历史回测线程（逐期滚动预测并与真实开奖对比）"""
+    log_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool)  # True=回测成功，False=失败
+
+    def __init__(self, lottery_type, model_type, periods=None, seed=42):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.model_type = model_type
+        self.periods = periods
+        self.seed = seed
+        self.report = None  # 回测报告 dict（run 内填充，finished 后主线程读取）
+
+    def run(self):
+        """运行回测"""
+        try:
+            # 延迟 import：backtest 模块内部避免加载 scripts/data_analysis
+            # （其 PyQt5 依赖与 torch 的 DLL 初始化冲突，见 pyqt5-torch-dll-conflict）
+            from backtest import run_backtest
+            report = run_backtest(
+                self.lottery_type,
+                self.model_type,
+                periods=self.periods,
+                seed=self.seed,
+                log_callback=lambda msg: self.log_signal.emit(msg),
+            )
+            self.report = report
+            self.finished_signal.emit(report is not None)
+        except Exception as e:
+            self.log_signal.emit(f"回测过程中出错: {str(e)}")
+            try:
+                import traceback
+                self.log_signal.emit(traceback.format_exc())
+            except Exception:
+                pass
+            self.finished_signal.emit(False) 
