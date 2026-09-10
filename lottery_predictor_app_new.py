@@ -160,11 +160,12 @@ class LotteryPredictorApp(QMainWindow):
         # 创建历史回测标签页
         self.backtest_tab = QWidget()
         self.bt_start_button, self.bt_lottery_combo, self.bt_model_combo, \
-        self.bt_periods_spin, self.bt_result_text, self.bt_status_label = \
-            create_backtest_tab(self.backtest_tab)
+        self.bt_periods_spin, self.bt_result_text, self.bt_status_label, \
+        self.bt_verify_button = create_backtest_tab(self.backtest_tab)
         
         # 连接信号和槽
         self.bt_start_button.clicked.connect(self.start_backtest)
+        self.bt_verify_button.clicked.connect(self.verify_prediction_records)
         self.backtest_thread = None
         
         # 添加标签页 - 注意顺序调整：预测放在第一个，期望值放在第二个
@@ -302,6 +303,8 @@ class LotteryPredictorApp(QMainWindow):
                     break
         
         result_text = f"预测的{num_predictions}个{lottery_name}号码：\n"
+        # 本次预测的所有号码（红, 蓝），用于自动存档核验
+        collected_predictions = []
         
         try:
             if model_type == 'lstm-crf':
@@ -355,8 +358,12 @@ class LotteryPredictorApp(QMainWindow):
                         # 格式化显示结果
                         if lottery_type == "dlt":
                             result_text += f"  第 {i+1} 组: {' '.join(map(str, extra_randomness[:5]))} + {' '.join(map(str, extra_randomness[5:]))}\n"
+                            collected_predictions.append(
+                                (list(extra_randomness[:5]), list(extra_randomness[5:])))
                         else:
                             result_text += f"  第 {i+1} 组: {' '.join(map(str, extra_randomness[:6]))} + {str(extra_randomness[6])}\n"
+                            collected_predictions.append(
+                                (list(extra_randomness[:6]), [int(extra_randomness[6])]))
             else:
                 # 使用机器学习模型预测
                 model_key = f"{lottery_type}_{model_type}"
@@ -415,10 +422,17 @@ class LotteryPredictorApp(QMainWindow):
                     
                     if lottery_type == "dlt":
                         result_text += f"  第 {i+1} 组: {' '.join(map(str, red_predictions))} + {' '.join(map(str, blue_predictions))}\n"
+                        collected_predictions.append(
+                            (list(red_predictions), list(blue_predictions)))
                     else:
                         result_text += f"  第 {i+1} 组: {' '.join(map(str, red_predictions))} + {str(blue_predictions[0])}\n"
+                        collected_predictions.append(
+                            (list(red_predictions), [int(blue_predictions[0])]))
 
             self.result_label.setText(result_text)
+            # 自动存档预测记录（供'历史回测'页核验，失败不影响结果）
+            self._save_prediction_records(lottery_type, model_type,
+                                          collected_predictions)
 
         except Exception as e:
             import traceback
@@ -429,6 +443,44 @@ class LotteryPredictorApp(QMainWindow):
 
     def update_log(self, text):
         self.log_box.append(text)
+
+    def _save_prediction_records(self, lottery_type, model_type, predictions):
+        """
+        将本次生成的预测号码自动存档，供'历史回测'页核验。
+        存档失败不影响预测结果展示。
+        """
+        try:
+            if not predictions:
+                return
+            # 预测时已知的最新开奖期（核验时找其后第一期）
+            df = load_lottery_data(lottery_type)
+            latest_period = int(df['期数'].max())
+            from prediction_records import add_prediction_record
+            count = None
+            for red_nums, blue_nums in predictions:
+                count = add_prediction_record(
+                    lottery_type, model_type, latest_period,
+                    red_nums, blue_nums)
+            if count:
+                self.log_emitter.new_log.emit(
+                    f"已存档 {len(predictions)} 注预测记录（累计 {count} 注），"
+                    f"可在'历史回测'页核验中奖情况")
+        except Exception as e:
+            self.log_emitter.new_log.emit(
+                f"预测记录存档失败(不影响预测): {e}")
+
+    def verify_prediction_records(self):
+        """核验预测记录：统计实际生成过的预测的中奖情况"""
+        try:
+            from prediction_records import verify_records, format_verify_summary
+            self.bt_status_label.setText("核验中...")
+            report = verify_records(
+                log_callback=lambda msg: self.log_emitter.new_log.emit(msg))
+            self.bt_result_text.append("\n" + format_verify_summary(report))
+            self.bt_status_label.setText("核验完成")
+        except Exception as e:
+            self.bt_result_text.append(f"\n[核验失败: {e}]")
+            self.bt_status_label.setText("核验失败")
         scrollbar = self.log_box.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         

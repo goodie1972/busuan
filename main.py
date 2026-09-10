@@ -183,6 +183,17 @@ def run_app():
     from lottery_predictor_app_new import main as app_main
     app_main()
 
+def verify_records_cli():
+    """命令行核验预测记录：实际生成过的预测 vs 对应期开奖"""
+    logger.info("开始核验预测记录...")
+    from prediction_records import verify_records, format_verify_summary
+    report = verify_records(log_callback=lambda msg: logger.info(msg))
+    if report is None:
+        logger.error("核验失败：数据加载异常")
+        return False
+    print("\n" + format_verify_summary(report))
+    return True
+
 def main():
     """主函数，解析命令行参数并运行对应功能"""
     parser = argparse.ArgumentParser(description='彩票预测系统')
@@ -218,6 +229,10 @@ def main():
                                 help='仅回测最近N期(默认全部)')
     backtest_parser.add_argument('--output', default=None, help='报告JSON保存路径')
 
+    records_parser = subparsers.add_parser('records', help='核验预测记录(实际生成过的预测 vs 开奖)')
+    records_parser.add_argument('--verify', action='store_true', default=True,
+                                help='核验并显示摘要(默认)')
+
     app_parser = subparsers.add_parser('app', help='运行GUI应用程序')
     
 
@@ -236,6 +251,8 @@ def main():
     elif args.command == 'backtest':
         return run_backtest(args.lottery_type, args.model,
                             periods=args.periods, output=args.output)
+    elif args.command == 'records':
+        return verify_records_cli()
     elif args.command == 'app':
         return run_app()
     else:

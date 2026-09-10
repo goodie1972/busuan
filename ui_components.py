@@ -493,9 +493,12 @@ def create_backtest_tab(backtest_tab):
     start_button = QPushButton("开始回测")
     start_button.setMinimumHeight(32)
     start_button.setStyleSheet("font-weight: bold;")
+    verify_button = QPushButton("核验预测记录")
+    verify_button.setMinimumHeight(32)
     status_label = QLabel("就绪")
     status_label.setStyleSheet("color: #666666;")
     control_layout.addWidget(start_button)
+    control_layout.addWidget(verify_button)
     control_layout.addWidget(status_label, 1)
     bt_layout.addLayout(control_layout)
 
@@ -520,7 +523,7 @@ def create_backtest_tab(backtest_tab):
     bt_layout.addWidget(info_label)
 
     return (start_button, lottery_combo, model_combo, periods_spin,
-            result_text, status_label)
+            result_text, status_label, verify_button)
 
 
 def create_main_window():
