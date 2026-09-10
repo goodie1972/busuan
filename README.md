@@ -235,4 +235,6 @@ LottoProphet/
    python main.py fetch ssq  # 获取双色球数据
    python main.py train dlt  # 训练大乐透模型
    python main.py predict ssq --model lightgbm  # 使用LightGBM模型预测双色球
+   python main.py backtest ssq --model ensemble  # 历史数据回测(与随机基线对比)
+   python main.py backtest dlt --model lightgbm --periods 500  # 仅回测最近500期
    ```

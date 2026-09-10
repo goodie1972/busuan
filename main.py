@@ -59,6 +59,13 @@ def fix_torch_dlls():
     修复 PyInstaller 打包后 torch DLL 加载失败的问题。
     在 torch 被导入之前，先设置环境变量并预加载 DLL 文件。
     """
+    # 无条件先设置环境变量，解决 OpenMP 运行时冲突（libiomp5 与 numpy/scipy 冲突
+    # 会导致 WinError 1114）。此设置必须在 torch 被 import 前完成，且不依赖打包路径。
+    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+    os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+
     # 获取基础路径（兼容 PyInstaller 打包环境）
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         base_path = sys._MEIPASS
@@ -74,6 +81,8 @@ def fix_torch_dlls():
             return  # 不是打包环境，或者没有 torch lib，跳过
 
     # 设置环境变量，解决 OpenMP 冲突
+    # （已在 fix_torch_dlls 中设置；此处为直接运行 backtest.py 时兜底，
+    #   必须在 torch 被 import 前完成，否则与 numpy 的 OpenMP 运行时冲突 WinError 1114）
     os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
     os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
     os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -154,6 +163,19 @@ def predict(lottery_type, model_type):
     
     return results
 
+def run_backtest(lottery_type, model_type, periods=None, output=None):
+    """历史数据回测：逐期滚动预测并与实际开奖对比"""
+    logger.info(f"开始回测{lottery_type}彩票的{model_type}模型...")
+
+    from backtest import run_backtest as bt_run
+    result = bt_run(lottery_type, model_type, periods=periods, output_path=output,
+                    log_callback=lambda msg: logger.info(msg))
+    if result:
+        logger.info("回测完成")
+    else:
+        logger.error("回测失败")
+    return result is not None
+
 def run_app():
     """运行完整的GUI应用程序"""
     logger.info("启动彩票预测应用程序...")
@@ -186,7 +208,16 @@ def main():
                                choices=['random_forest', 'xgboost', 'gbdt', 'lightgbm', 'catboost', 'ensemble'],
                                help='模型类型')
     
-  
+    
+    backtest_parser = subparsers.add_parser('backtest', help='历史数据回测')
+    backtest_parser.add_argument('lottery_type', choices=['dlt', 'ssq'], help='彩票类型')
+    backtest_parser.add_argument('--model', default='ensemble',
+                                choices=['random_forest', 'xgboost', 'gbdt', 'lightgbm', 'catboost', 'ensemble'],
+                                help='模型类型')
+    backtest_parser.add_argument('--periods', type=int, default=None,
+                                help='仅回测最近N期(默认全部)')
+    backtest_parser.add_argument('--output', default=None, help='报告JSON保存路径')
+
     app_parser = subparsers.add_parser('app', help='运行GUI应用程序')
     
 
@@ -202,6 +233,9 @@ def main():
         return train_model(args.lottery_type, args.model)
     elif args.command == 'predict':
         return predict(args.lottery_type, args.model)
+    elif args.command == 'backtest':
+        return run_backtest(args.lottery_type, args.model,
+                            periods=args.periods, output=args.output)
     elif args.command == 'app':
         return run_app()
     else:

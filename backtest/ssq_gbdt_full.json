@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "lottery_type": "ssq",
+    "lottery_name": "双色球",
+    "model_type": "gbdt",
+    "feature_window": 10,
+    "generated_at": "2026-09-10 10:21:22",
+    "cost_per_bet": 2.0
+  },
+  "periods": {
+    "total_in_file": 3501,
+    "backtested": 3491,
+    "start_period": 3011,
+    "end_period": 26104
+  },
+  "pnl": {
+    "cost_total": 6982.0,
+    "prize_total_fixed": 4470,
+    "net": -2512.0,
+    "roi": -35.98,
+    "note": "一、二等奖为浮动奖金，金额按0计入"
+  },
+  "model_performance": {
+    "any_prize_rate": 0.065597,
+    "expected_prize_per_bet": 1.2804,
+    "red_hit_distribution": {
+      "0": 971,
+      "1": 1527,
+      "2": 797,
+      "3": 180,
+      "4": 15,
+      "5": 1,
+      "6": 0
+    },
+    "blue_hit_distribution": {
+      "0": 3276,
+      "1": 215
+    },
+    "prize_counts": {
+      "六等奖": 200,
+      "五等奖": 27,
+      "三等奖": 1,
+      "四等奖": 1
+    }
+  },
+  "random_baseline": {
+    "simulations": 100000,
+    "any_prize_rate": 0.06772,
+    "expected_prize_per_bet": 0.4973,
+    "red_hit_distribution": {
+      "0": 0.26576,
+      "1": 0.43787,
+      "2": 0.23798,
+      "3": 0.05345,
+      "4": 0.00479,
+      "5": 0.00015,
+      "6": 0.0
+    },
+    "blue_hit_distribution": {
+      "0": 0.93689,
+      "1": 0.06311
+    },
+    "prize_counts": {
+      "六等奖": 5944,
+      "五等奖": 781,
+      "四等奖": 46,
+      "三等奖": 1
+    }
+  },
+  "comparison": {
+    "any_prize_rate": {
+      "model": 0.065597,
+      "random": 0.06772
+    },
+    "expected_prize_per_bet": {
+      "model": 1.2804,
+      "random": 0.4973
+    },
+    "note": "每注期望均不含浮动奖(一、二等奖)"
+  },
+  "notes": [
+    "回测存在训练集泄漏(模型训练时见过全部历史)，结果偏乐观",
+    "应作为相对评估(与随机基线对比)，而非对未来收益的承诺",
+    "彩票为独立随机事件，长期期望收益为负"
+  ]
+}
