@@ -138,6 +138,15 @@ class WrappedCatBoostModel:
 def _class_proba_dict(model, X_scaled):
     """获取模型对单样本的逐类概率 dict {类别索引(号码-1): 概率}；无概率信息时返回 None"""
     try:
+        # 递归解包（加载时可能出现包装器嵌套：wrapper.model = wrapper.model = Booster）
+        base = model
+        for _ in range(5):
+            if not type(base).__name__.startswith('Wrapped'):
+                break
+            inner = getattr(base, 'model', None)
+            if inner is None or inner is base:
+                break
+            base = inner
         # sklearn 系分类器：classes_ + predict_proba（概率列顺序=classes_）
         classes = getattr(model, 'classes_', None)
         if classes is not None and hasattr(model, 'predict_proba'):
@@ -145,13 +154,17 @@ def _class_proba_dict(model, X_scaled):
             if row.ndim == 2:
                 row = row[0]
                 return {int(c): float(row[i]) for i, c in enumerate(classes) if i < len(row)}
-        # xgboost Booster（无 classes_）：multi:softmax 下 predict 直接返回概率矩阵
-        if 'Booster' in type(model).__name__:
-            try:
-                import xgboost as xgb
-                row = np.asarray(model.predict(xgb.DMatrix(X_scaled)))
-            except Exception:
-                row = np.asarray(model.predict(X_scaled))
+        # lightgbm / xgboost Booster（无 classes_、predict 直接返回概率矩阵）
+        # 注意: 必须用解包后的 base 调用，包装器 predict 会经 process_prediction 转成类别索引
+        if 'Booster' in type(base).__name__:
+            if 'XGB' in type(base).__name__:
+                try:
+                    import xgboost as xgb
+                    row = np.asarray(base.predict(xgb.DMatrix(X_scaled)))
+                except Exception:
+                    row = np.asarray(base.predict(X_scaled))
+            else:
+                row = np.asarray(base.predict(X_scaled))
             if row.ndim == 2:
                 row = row[0]
                 return {i: float(row[i]) for i in range(len(row))}

@@ -287,8 +287,8 @@ def run_backtest(lottery_type, model_type, periods=None, output_path=None,
     quantile_cal = []
     if valid_conf:
         sorted_valid = sorted(valid_conf, key=lambda r: r['confidence']['overall'])
-        n = len(sorted_valid)
-        third = max(1, n // 3)
+        nv = len(sorted_valid)
+        third = max(1, nv // 3)
         chunks = [
             ('低置信度', sorted_valid[:third]),
             ('中置信度', sorted_valid[third:2 * third]),
