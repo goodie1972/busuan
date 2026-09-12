@@ -958,6 +958,11 @@ class LotteryMLModels:
                         
                         # 记录每个样本的投票
                         for i, pred in enumerate(y_pred):
+                            # catboost 等可能返回 (n,1) 形状，pred 为单元素数组，需转标量才能作 dict key
+                            if isinstance(pred, np.ndarray):
+                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
+                            else:
+                                pred = int(pred)
                             if i not in red_votes:
                                 red_votes[i] = {}
                             if pred not in red_votes[i]:
@@ -1010,6 +1015,11 @@ class LotteryMLModels:
                         
                         # 记录每个样本的投票
                         for i, pred in enumerate(y_pred):
+                            # catboost 等可能返回 (n,1) 形状，pred 为单元素数组，需转标量才能作 dict key
+                            if isinstance(pred, np.ndarray):
+                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
+                            else:
+                                pred = int(pred)
                             if i not in blue_votes:
                                 blue_votes[i] = {}
                             if pred not in blue_votes[i]:
@@ -1603,6 +1613,11 @@ class LotteryMLModels:
                     preds = model.predict(X_scaled)[0]
                     if hasattr(preds, "__iter__"):
                         for pred in preds:
+                            # 统一转标量：catboost 等可能输出单元素数组
+                            if isinstance(pred, np.ndarray):
+                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
+                            else:
+                                pred = int(pred)
                             if pred not in red_votes:
                                 red_votes[pred] = 0
                             red_votes[pred] += 1
@@ -1639,6 +1654,11 @@ class LotteryMLModels:
                     preds = model.predict(X_scaled)[0]
                     if hasattr(preds, "__iter__"):
                         for pred in preds:
+                            # 统一转标量：catboost 等可能输出单元素数组
+                            if isinstance(pred, np.ndarray):
+                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
+                            else:
+                                pred = int(pred)
                             if pred not in blue_votes:
                                 blue_votes[pred] = 0
                             blue_votes[pred] += 1
