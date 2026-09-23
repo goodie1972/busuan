@@ -417,8 +417,11 @@ class LotteryPredictorApp(QMainWindow):
                 
                 # 复式模式：按概率取前N个号码组成号码池，不走多组单式循环
                 if self.compound_check.isChecked():
-                    red_extra = self.compound_red_spin.value()
-                    blue_extra = self.compound_blue_spin.value()
+                    # 输入的是"总数"（如双色球红8 = 8选6），换算为额外个数
+                    red_total = self.compound_red_spin.value()
+                    blue_total = self.compound_blue_spin.value()
+                    red_extra = max(red_total - ml_model.red_count, 0)
+                    blue_extra = max(blue_total - ml_model.blue_count, 0)
                     if red_extra > 0 or blue_extra > 0:
                         red_numbers, blue_numbers = ml_model.predict_compound(
                             recent_data, extra_red=red_extra, extra_blue=blue_extra)
@@ -442,6 +445,9 @@ class LotteryPredictorApp(QMainWindow):
                             f"复式预测完成: 红{len(red_numbers)}选{ml_model.red_count} "
                             f"蓝{len(blue_numbers)}选{ml_model.blue_count}，{n_notes}注/{n_notes * 2}元")
                         return
+                    else:
+                        self.log_emitter.new_log.emit(
+                            f"复式总数未超过单式（红{red_total}/{ml_model.red_count} 蓝{blue_total}/{ml_model.blue_count}），按单式生成预测")
                 
                 for i in range(num_predictions):
                     red_predictions, blue_predictions = ml_model.predict(recent_data)

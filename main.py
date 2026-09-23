@@ -163,8 +163,14 @@ def predict(lottery_type, model_type, compound_red=0, compound_blue=0):
                 return None
             df = load_lottery_data(lottery_type)
             recent_data = df.sort_values('期数', ascending=False).head(ml_model.feature_window)
+            # 输入为总数（如8 = 8选6），换算为额外个数
+            red_extra = max(compound_red - ml_model.red_count, 0)
+            blue_extra = max(compound_blue - ml_model.blue_count, 0)
+            if red_extra <= 0 and blue_extra <= 0:
+                logger.error(f"复式总数未超过单式(红{compound_red}/{ml_model.red_count} 蓝{compound_blue}/{ml_model.blue_count})")
+                return None
             red_numbers, blue_numbers = ml_model.predict_compound(
-                recent_data, extra_red=compound_red, extra_blue=compound_blue)
+                recent_data, extra_red=red_extra, extra_blue=blue_extra)
             if red_numbers is None or blue_numbers is None:
                 logger.error(f"复式预测失败")
                 return None
@@ -252,9 +258,9 @@ def main():
                                choices=['random_forest', 'xgboost', 'gbdt', 'lightgbm', 'catboost', 'ensemble'],
                                help='模型类型')
     predict_parser.add_argument('--compound-red', type=int, default=0, metavar='N',
-                               help='复式红球数(超出单式的额外个数, 如ssq单式6个, 传2则复式8个)')
+                               help='复式红球总数(如ssq传8 = 8个红球里选6, 0=不启用)')
     predict_parser.add_argument('--compound-blue', type=int, default=0, metavar='N',
-                               help='复式蓝球数(超出单式的额外个数, 如ssq单式1个, 传2则复式3个)')
+                               help='复式蓝球总数(如ssq传2 = 2个蓝球里选1, 0=不启用)')
     
     
     backtest_parser = subparsers.add_parser('backtest', help='历史数据回测')
