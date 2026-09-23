@@ -149,8 +149,41 @@ def train_model(lottery_type, model_type):
     
     return success
 
-def predict(lottery_type, model_type):
+def predict(lottery_type, model_type, compound_red=0, compound_blue=0):
     """使用训练好的模型进行预测"""
+    # 复式预测：直接调 predict_compound，输出号码池+注数（不走多组单式循环）
+    if compound_red > 0 or compound_blue > 0:
+        logger.info(f"使用{model_type}模型复式预测{lottery_type}彩票...")
+        try:
+            from ml_models import LotteryMLModels
+            from scripts.data_analysis import load_lottery_data
+            ml_model = LotteryMLModels(lottery_type=lottery_type, model_type=model_type)
+            if not ml_model.load_models():
+                logger.error(f"模型{model_type}尚未训练，请先训练模型。")
+                return None
+            df = load_lottery_data(lottery_type)
+            recent_data = df.sort_values('期数', ascending=False).head(ml_model.feature_window)
+            red_numbers, blue_numbers = ml_model.predict_compound(
+                recent_data, extra_red=compound_red, extra_blue=compound_blue)
+            if red_numbers is None or blue_numbers is None:
+                logger.error(f"复式预测失败")
+                return None
+            from math import comb
+            n_notes = comb(len(red_numbers), ml_model.red_count) * comb(len(blue_numbers), ml_model.blue_count)
+            result = {
+                'compound_red': red_numbers,
+                'compound_blue': blue_numbers,
+                'notes': n_notes,
+                'amount': n_notes * 2,
+            }
+            logger.info(f"复式红球({len(red_numbers)}选{ml_model.red_count}): {red_numbers}")
+            logger.info(f"复式蓝球({len(blue_numbers)}选{ml_model.blue_count}): {blue_numbers}")
+            logger.info(f"共 {n_notes} 注, 投注金额 {n_notes * 2} 元")
+            return result
+        except Exception as e:
+            logger.error(f"复式预测失败: {e}")
+            return None
+
     logger.info(f"使用{model_type}模型预测{lottery_type}彩票...")
     
     from lottery_predictor_app_new import predict_next_draw as app_predict
@@ -218,6 +251,10 @@ def main():
     predict_parser.add_argument('--model', default='lightgbm',
                                choices=['random_forest', 'xgboost', 'gbdt', 'lightgbm', 'catboost', 'ensemble'],
                                help='模型类型')
+    predict_parser.add_argument('--compound-red', type=int, default=0, metavar='N',
+                               help='复式红球数(超出单式的额外个数, 如ssq单式6个, 传2则复式8个)')
+    predict_parser.add_argument('--compound-blue', type=int, default=0, metavar='N',
+                               help='复式蓝球数(超出单式的额外个数, 如ssq单式1个, 传2则复式3个)')
     
     
     backtest_parser = subparsers.add_parser('backtest', help='历史数据回测')
@@ -247,7 +284,8 @@ def main():
     elif args.command == 'train':
         return train_model(args.lottery_type, args.model)
     elif args.command == 'predict':
-        return predict(args.lottery_type, args.model)
+        return predict(args.lottery_type, args.model,
+                       compound_red=args.compound_red, compound_blue=args.compound_blue)
     elif args.command == 'backtest':
         return run_backtest(args.lottery_type, args.model,
                             periods=args.periods, output=args.output)

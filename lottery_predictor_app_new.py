@@ -124,7 +124,8 @@ class LotteryPredictorApp(QMainWindow):
         self.main_tab = QWidget()
         self.predict_button, self.train_button, self.pause_button, self.analyze_button, self.update_data_button, \
         self.lottery_combo, self.prediction_spin, self.gpu_checkbox, self.result_label, self.log_box, \
-        self.theme_combo, self.customize_theme_button, self.model_combo = create_main_tab(self.main_tab)
+        self.theme_combo, self.customize_theme_button, self.model_combo, \
+        self.compound_check, self.compound_red_spin, self.compound_blue_spin = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -413,6 +414,34 @@ class LotteryPredictorApp(QMainWindow):
                 
                 df = load_lottery_data(lottery_type)
                 recent_data = df.sort_values('期数', ascending=False).head(ml_model.feature_window)
+                
+                # 复式模式：按概率取前N个号码组成号码池，不走多组单式循环
+                if self.compound_check.isChecked():
+                    red_extra = self.compound_red_spin.value()
+                    blue_extra = self.compound_blue_spin.value()
+                    if red_extra > 0 or blue_extra > 0:
+                        red_numbers, blue_numbers = ml_model.predict_compound(
+                            recent_data, extra_red=red_extra, extra_blue=blue_extra)
+                        if red_numbers is None or blue_numbers is None:
+                            raise ValueError("复式预测失败（期望值/xgboost 模型可能不支持复式）")
+                        from math import comb
+                        n_notes = comb(len(red_numbers), ml_model.red_count) * \
+                            comb(len(blue_numbers), ml_model.blue_count)
+                        result_text = (
+                            f"【复式预测】{MODEL_TYPES[model_type]} 模型\n"
+                            f"最新期: {int(df['期数'].max())}\n"
+                            f"红球({len(red_numbers)}选{ml_model.red_count}): "
+                            f"{' '.join(map(str, red_numbers))}\n"
+                            f"蓝球({len(blue_numbers)}选{ml_model.blue_count}): "
+                            f"{' '.join(map(str, blue_numbers))}\n"
+                            f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
+                            f"（按模型概率从高到低取号；复式结果不写入核验存档）"
+                        )
+                        self.result_label.setText(result_text)
+                        self.log_emitter.new_log.emit(
+                            f"复式预测完成: 红{len(red_numbers)}选{ml_model.red_count} "
+                            f"蓝{len(blue_numbers)}选{ml_model.blue_count}，{n_notes}注/{n_notes * 2}元")
+                        return
                 
                 for i in range(num_predictions):
                     red_predictions, blue_predictions = ml_model.predict(recent_data)

@@ -115,6 +115,23 @@ def create_main_tab(main_tab):
     settings_layout.addRow("预测数量:", prediction_spin)
     settings_layout.addRow("预测模型:", model_combo)
 
+    compound_check = QCheckBox("复式模式(按概率取前N个号码)")
+    compound_check.setToolTip("勾选后按模型概率取前N个号码组成号码池，而非单式固定数量")
+    compound_red_spin = QSpinBox()
+    compound_red_spin.setRange(0, 20)
+    compound_red_spin.setValue(2)
+    compound_red_spin.setToolTip("红球额外个数(如双色球单式6个，填2则复式8选6)")
+    compound_blue_spin = QSpinBox()
+    compound_blue_spin.setRange(0, 10)
+    compound_blue_spin.setValue(1)
+    compound_blue_spin.setToolTip("蓝球额外个数(如双色球单式1个，填2则复式3选1)")
+    compound_layout = QVBoxLayout()
+    compound_layout.setSpacing(4)
+    compound_layout.addWidget(compound_check)
+    compound_layout.addWidget(compound_red_spin)
+    compound_layout.addWidget(compound_blue_spin)
+    settings_layout.addRow("复式设置:", compound_layout)
+
     gpu_group = QGroupBox("GPU设置")
     gpu_layout = QVBoxLayout(gpu_group)
     gpu_layout.setSpacing(6)
@@ -186,7 +203,8 @@ def create_main_tab(main_tab):
     
     return (predict_button, train_button, pause_button, analyze_button, update_data_button,
             lottery_combo, prediction_spin, gpu_checkbox, result_label, log_box,
-            theme_combo, customize_theme_button, model_combo)
+            theme_combo, customize_theme_button, model_combo,
+            compound_check, compound_red_spin, compound_blue_spin)
 
 
 def create_analysis_tab(analysis_tab):

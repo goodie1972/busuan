@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import joblib
+from math import comb
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -1777,6 +1778,109 @@ class LotteryMLModels:
         if result is None or result[0] is None:
             return None, None, None
         return result[0], result[1], getattr(self, 'last_confidence', None)
+
+    def predict_compound(self, recent_data, extra_red=0, extra_blue=0):
+        """
+        预测复式号码：按模型概率排序（ensemble 为各子模型平均概率），
+        返回 top (red_count+extra_red) 红球 + top (blue_count+extra_blue) 蓝球，
+        而非单式的固定数量号码。确定性输出，不做随机扰动。
+
+        Args:
+            recent_data: 历史数据 DataFrame（与 predict 相同）
+            extra_red: 红球额外数量，复式红球数 = red_count + extra_red（上限为号码范围）
+            extra_blue: 蓝球额外数量，复式蓝球数 = blue_count + extra_blue
+
+        Returns:
+            (red_numbers, blue_numbers) 或 (None, None)
+            复式注数 = C(红球数, red_count) × C(蓝球数, blue_count)，金额 = 注数 × 2 元
+        """
+        # 复式数量不能超过号码范围
+        red_need = min(self.red_count + extra_red, self.red_range)
+        blue_need = min(self.blue_count + extra_blue, self.blue_range)
+        if red_need <= self.red_count and blue_need <= self.blue_count:
+            self.log("复式数量未超出单式，退化为单式预测")
+            return self.predict(recent_data)
+
+        if self.model_type == 'expected_value':
+            self.log("期望值模型不支持复式预测，请使用 ensemble/gbdt/lightgbm/catboost")
+            return None, None
+
+        try:
+            # ---- 特征构建（与 predict 保持一致）----
+            if self.lottery_type == 'dlt':
+                red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:5]
+                blue_cols = [col for col in recent_data.columns if col.startswith('蓝球_')][:2]
+            else:  # ssq
+                red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:6]
+                # SSQ 蓝球列名为"蓝球"(无下划线)，必须与 predict/训练兼容
+                blue_cols = []
+                for col in recent_data.columns:
+                    if col.startswith('蓝球_') or col == '蓝球':
+                        blue_cols.append(col)
+                        if len(blue_cols) >= 1:
+                            break
+
+            recent_data = recent_data.sort_values('期数', ascending=False).reset_index(drop=True)
+            if len(recent_data) < self.feature_window:
+                self.log(f"历史数据不足，需要至少 {self.feature_window} 期")
+                return None, None
+
+            # 滑动窗口创建序列特征
+            features = []
+            for j in range(self.feature_window):
+                row_features = []
+                for col in red_cols + blue_cols:
+                    row_features.append(recent_data.iloc[j][col])
+                features.append(row_features)
+            X = np.array([features])
+            X_reshaped = X.reshape(X.shape[0], -1)
+
+            # 特征缩放（与 predict 相同的回退逻辑）
+            try:
+                if 'X' in self.scalers:
+                    X_scaled = self.scalers['X'].transform(X_reshaped)
+                else:
+                    X_scaled = self.scalers['red'].transform(X_reshaped)
+            except Exception:
+                X_scaled = X_reshaped
+
+            # ---- 获取全号码概率排序 ----
+            if self.model_type == 'ensemble':
+                red_proba = _ensemble_proba_dict(self.models['red'], X_scaled)
+                blue_proba = _ensemble_proba_dict(self.models['blue'], X_scaled)
+            else:
+                red_proba = _class_proba_dict(self.models['red'], X_scaled)
+                blue_proba = _class_proba_dict(self.models['blue'], X_scaled)
+
+            if not red_proba or not blue_proba:
+                self.log("模型无概率输出，无法生成复式。xgboost(softmax)等模型不支持，请改用 ensemble/gbdt/lightgbm/catboost")
+                return None, None
+
+            red_ranked = sorted(red_proba.items(), key=lambda x: x[1], reverse=True)
+            blue_ranked = sorted(blue_proba.items(), key=lambda x: x[1], reverse=True)
+            red_numbers = [int(p) + 1 for p, _ in red_ranked[:red_need]]
+            blue_numbers = [int(p) + 1 for p, _ in blue_ranked[:blue_need]]
+
+            # 数量不足时随机补充
+            while len(red_numbers) < red_need:
+                new_num = np.random.randint(1, self.red_range + 1)
+                if new_num not in red_numbers:
+                    red_numbers.append(new_num)
+            while len(blue_numbers) < blue_need:
+                new_num = np.random.randint(1, self.blue_range + 1)
+                if new_num not in blue_numbers:
+                    blue_numbers.append(new_num)
+
+            red_numbers = sorted(red_numbers)[:red_need]
+            blue_numbers = sorted(blue_numbers)[:blue_need]
+            n_notes = comb(red_need, self.red_count) * comb(blue_need, self.blue_count)
+            self.log(f"复式预测: 红球{red_need}个 + 蓝球{blue_need}个，共 {n_notes} 注（{n_notes * 2} 元）")
+            return red_numbers, blue_numbers
+        except Exception as e:
+            self.log(f"复式预测出错: {e}")
+            import traceback
+            self.log(traceback.format_exc())
+            return None, None
 
 # 使用示例
 def demo():
