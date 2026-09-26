@@ -415,6 +415,12 @@ def create_expected_value_tab(expected_value_tab):
     result_label.setWordWrap(True)
     result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD;")
     result_label.setMinimumHeight(150)
+    # 预测结果字体：比默认大两个号并加粗（与主预测页一致）
+    from PyQt5.QtGui import QFont
+    result_font = QFont(result_label.font())
+    result_font.setPointSize(result_font.pointSize() + 2)
+    result_font.setBold(True)
+    result_label.setFont(result_font)
     
     results_layout.addWidget(result_label)
     
