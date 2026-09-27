@@ -257,7 +257,7 @@ def create_main_tab(main_tab):
     result_label = QLabel("点击'生成预测'按钮查看预测结果")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setWordWrap(True)
-    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
+    result_label.setStyleSheet("padding: 10px; border: 1px solid #8B6F47; border-radius: 3px; font-size: 14pt; font-weight: bold;")
     result_label.setMinimumHeight(200)
     # 预测结果字体：比默认大两个号并加粗
     from PyQt5.QtGui import QFont
@@ -407,7 +407,7 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     result_label = QLabel("点击'运行高级统计分析'按钮查看统计分析结果")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setMinimumHeight(500)
-    result_label.setStyleSheet("background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
+    result_label.setStyleSheet("padding: 10px; border: 1px solid #8B6F47; border-radius: 3px; font-size: 14pt; font-weight: bold;")
     
     # 使用QScrollArea包裹结果显示区域，以支持滚动
     scroll_area = QScrollArea()
@@ -496,7 +496,7 @@ def create_expected_value_tab(expected_value_tab):
     result_label = QLabel("期望值模型预测结果将显示在这里")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setWordWrap(True)
-    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
+    result_label.setStyleSheet("padding: 10px; border: 1px solid #8B6F47; border-radius: 3px; font-size: 14pt; font-weight: bold;")
     result_label.setMinimumHeight(150)
     # 预测结果字体：比默认大两个号并加粗（与主预测页一致）
     from PyQt5.QtGui import QFont
