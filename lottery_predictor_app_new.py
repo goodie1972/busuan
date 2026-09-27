@@ -104,7 +104,7 @@ class LotteryPredictorApp(QMainWindow):
             self.ev_log_box.customContextMenuRequested.connect(self.show_ev_log_context_menu)
 
     def initUI(self):
-        self.setWindowTitle(f"卜算 - 彩票预测软件 - GPU: {self.cuda_info}")
+        self.setWindowTitle(f"卜算 - 彩票娱乐软件 - GPU: {self.cuda_info}")
         self.setGeometry(50, 50, 1920, 1360)
 
         self.tab_widget = QTabWidget()
