@@ -105,7 +105,7 @@ class LotteryPredictorApp(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle(f"彩票预测软件 - GPU: {self.cuda_info}")
-        self.setGeometry(100, 100, 960, 680)
+        self.setGeometry(50, 50, 1920, 1360)
         
         self.tab_widget = QTabWidget()
         

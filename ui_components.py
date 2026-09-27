@@ -48,12 +48,12 @@ def create_main_tab(main_tab):
     row1 = QHBoxLayout()
     row1.setSpacing(12)
     lottery_label = QLabel("彩票类型:")
-    lottery_label.setStyleSheet(label_style)
+    lottery_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     lottery_combo = QComboBox()
     lottery_combo.setStyleSheet(spin_style)
     lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
     model_label = QLabel("预测模型:")
-    model_label.setStyleSheet(label_style)
+    model_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     model_combo = QComboBox()
     model_combo.setStyleSheet(spin_style)
     model_combo.addItem("LSTM-CRF (默认)")
@@ -172,6 +172,23 @@ def create_main_tab(main_tab):
                         card.setChecked(False)
                         card.blockSignals(False)
                 mode_combo.setCurrentText(checked_card.title())
+                # 切换到复式/胆拖时禁用不支持该模式的模型选项
+                mode_text = checked_card.title()
+                unsupported = {"LSTM-CRF", "XGBoost", "期望值"}
+                for i in range(model_combo.count()):
+                    item_text = model_combo.itemText(i)
+                    should_disable = mode_text in ("复式", "胆拖") and \
+                        any(k in item_text for k in unsupported)
+                    item = model_combo.model().item(i)
+                    if item:
+                        item.setEnabled(not should_disable)
+                # 如果当前选中被禁用，切到第一个可用项
+                cur_item = model_combo.model().item(model_combo.currentIndex())
+                if cur_item and not cur_item.isEnabled():
+                    for i in range(model_combo.count()):
+                        if model_combo.model().item(i).isEnabled():
+                            model_combo.setCurrentIndex(i)
+                            break
         return _toggled
 
     for card in mode_cards.values():
