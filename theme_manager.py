@@ -101,6 +101,22 @@ class ThemeManager:
                 "warning": "#FFAB00",
                 "error": "#FF3D00"
             },
+            "卜算古风": {
+                "background": "#1C1812",         # 墨黑底
+                "primary": "#C9702D",           # 朱砂金
+                "primary_hover": "#D4853E",     
+                "primary_pressed": "#A65D24",   
+                "text": "#E8DCC8",              # 宣纸黄白
+                "border": "#8B6F47",            # 青铜边框
+                "panel": "#2A241A",             # 深宣纸
+                "disabled_bg": "#4A3D2E",
+                "disabled_text": "#8B7D5E",
+                "tab_bg": "#3D3325",
+                "accent": "#E6B800",            # 御用黄
+                "success": "#4A7C59",           # 松柏绿
+                "warning": "#C9702D",           # 朱砂
+                "error": "#A52A2A"              # 腥红
+            },
             "自定义": {}  # 用户自定义主题
         }
         
