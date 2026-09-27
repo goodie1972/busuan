@@ -404,7 +404,7 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     advanced_layout.addLayout(control_layout)
     
     # 创建结果显示区域
-    result_label = QLabel("点击'运行分析'按钮查看统计分析结果")
+    result_label = QLabel("点击'运行高级统计分析'按钮查看统计分析结果")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setMinimumHeight(500)
     result_label.setStyleSheet("background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
