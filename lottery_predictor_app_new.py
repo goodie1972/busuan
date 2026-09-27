@@ -106,7 +106,19 @@ class LotteryPredictorApp(QMainWindow):
     def initUI(self):
         self.setWindowTitle(f"彩票预测软件 - GPU: {self.cuda_info}")
         self.setGeometry(50, 50, 1920, 1360)
-        
+
+        # 全局字体：所有 GroupBox 标题、文本框、标签统一 11pt（卡片自带样式不受影响）
+        self.setStyleSheet("""
+            QGroupBox { font-size: 11pt; font-weight: bold; }
+            QLabel { font-size: 11pt; }
+            QComboBox { font-size: 11pt; }
+            QSpinBox { font-size: 11pt; }
+            QPushButton { font-size: 11pt; }
+            QCheckBox { font-size: 11pt; }
+            QTextEdit { font-size: 11pt; }
+            QPlainTextEdit { font-size: 11pt; }
+        """)
+
         self.tab_widget = QTabWidget()
         
         # 创建期望值模型标签页 - 放在第二个位置

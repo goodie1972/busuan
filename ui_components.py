@@ -257,7 +257,7 @@ def create_main_tab(main_tab):
     result_label = QLabel("点击'生成预测'按钮查看预测结果")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setWordWrap(True)
-    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD;")
+    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
     result_label.setMinimumHeight(200)
     # 预测结果字体：比默认大两个号并加粗
     from PyQt5.QtGui import QFont
@@ -274,7 +274,7 @@ def create_main_tab(main_tab):
     
     log_box = QTextEdit()
     log_box.setReadOnly(True)
-    log_box.setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;")
+    log_box.setStyleSheet("font-family: Consolas, monospace; font-size: 11pt;")
     
     # 启用右键菜单
     log_box.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -347,7 +347,7 @@ def create_analysis_tab(analysis_tab):
     stats_text = QTextEdit()
     stats_text.setReadOnly(True)
     stats_text.setMaximumHeight(150)
-    stats_text.setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;")
+    stats_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11pt;")
     
     stats_layout.addWidget(stats_text)
     
@@ -407,7 +407,7 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     result_label = QLabel("点击'运行分析'按钮查看统计分析结果")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setMinimumHeight(500)
-    result_label.setStyleSheet("background-color: white; border: 1px solid #DDDDDD;")
+    result_label.setStyleSheet("background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
     
     # 使用QScrollArea包裹结果显示区域，以支持滚动
     scroll_area = QScrollArea()
@@ -496,7 +496,7 @@ def create_expected_value_tab(expected_value_tab):
     result_label = QLabel("期望值模型预测结果将显示在这里")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setWordWrap(True)
-    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD;")
+    result_label.setStyleSheet("padding: 10px; background-color: white; border: 1px solid #DDDDDD; font-size: 14pt; font-weight: bold;")
     result_label.setMinimumHeight(150)
     # 预测结果字体：比默认大两个号并加粗（与主预测页一致）
     from PyQt5.QtGui import QFont
@@ -513,7 +513,7 @@ def create_expected_value_tab(expected_value_tab):
     
     log_text = QTextEdit()
     log_text.setReadOnly(True)
-    log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;")
+    log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11pt;")
     log_text.setContextMenuPolicy(Qt.CustomContextMenu)
     
     log_layout.addWidget(log_text)
@@ -617,7 +617,7 @@ def create_backtest_tab(backtest_tab):
     results_layout = QVBoxLayout(results_group)
     result_text = QTextEdit()
     result_text.setReadOnly(True)
-    result_text.setStyleSheet("font-family: Consolas, monospace; font-size: 10pt;")
+    result_text.setStyleSheet("font-family: Consolas, monospace; font-size: 11pt;")
     results_layout.addWidget(result_text)
     bt_layout.addWidget(results_group, 1)
 
