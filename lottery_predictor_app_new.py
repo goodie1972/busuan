@@ -140,25 +140,28 @@ class LotteryPredictorApp(QMainWindow):
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
         self.analysis_combo, self.trend_feature_combo, self.chart_label, self.stats_text, \
-        self.advanced_stats_button, self.distribution_analysis_button, self.load_analysis_button = create_analysis_tab(self.analysis_tab)
+        self.advanced_stats_button, self.distribution_analysis_button, \
+        self.load_analysis_button, self.analysis_suggestion_button = create_analysis_tab(self.analysis_tab)
         
         # 连接信号和槽
         self.analysis_combo.currentIndexChanged.connect(self.update_analysis_view)
         self.trend_feature_combo.currentIndexChanged.connect(lambda: self.update_analysis_view(4))
-        self.advanced_stats_button.clicked.connect(self.show_advanced_statistics)
-        self.distribution_analysis_button.clicked.connect(self.show_distribution_analysis)
+        self.advanced_stats_button.triggered.connect(self.show_advanced_statistics)
+        self.distribution_analysis_button.triggered.connect(self.show_distribution_analysis)
         self.load_analysis_button.clicked.connect(self.analyze_data)
+        self.analysis_suggestion_button.clicked.connect(self.generate_analysis_suggestions)
         
         # 创建高级统计分析标签页
         self.advanced_stats_tab = QWidget()
         self.advanced_stats_lottery_combo, self.run_advanced_stats_button, \
         self.run_distribution_analysis_button, self.show_stats_data_button, \
-        self.stats_result_label = create_advanced_statistics_tab(self.advanced_stats_tab)
+        self.stats_result_label, self.adv_stats_suggestion_button = create_advanced_statistics_tab(self.advanced_stats_tab)
         
         # 连接信号和槽
-        self.run_advanced_stats_button.clicked.connect(self.run_advanced_statistics)
-        self.run_distribution_analysis_button.clicked.connect(self.run_distribution_analysis)
+        self.run_advanced_stats_button.triggered.connect(self.run_advanced_statistics)
+        self.run_distribution_analysis_button.triggered.connect(self.run_distribution_analysis)
         self.show_stats_data_button.clicked.connect(self.show_statistics_data)
+        self.adv_stats_suggestion_button.clicked.connect(self.generate_analysis_suggestions)
         
         # 创建历史回测标签页
         self.backtest_tab = QWidget()
@@ -1073,6 +1076,203 @@ class LotteryPredictorApp(QMainWindow):
             error_details = traceback.format_exc()
             self.log_box.append(f"显示统计数据出错：{str(e)}")
             self.log_box.append(f"错误详情：{error_details}")
+
+    def generate_analysis_suggestions(self):
+        """生成选号参考建议 - 将统计指标翻译成人话"""
+        try:
+            # 获取当前彩票类型
+            if hasattr(self, 'current_lottery_type') and self.current_lottery_type:
+                lottery_type = self.current_lottery_type
+            else:
+                # 从主界面获取
+                selected_index = self.lottery_combo.currentIndex()
+                selected_key = list(name_path.keys())[selected_index]
+                lottery_type = selected_key
+            
+            lottery_name = name_path[lottery_type]['name']
+            self.log_box.append(f"正在为{lottery_name}生成选号参考建议...")
+            QApplication.processEvents()
+            
+            # 加载数据
+            from scripts.data_analysis import load_lottery_data
+            df = load_lottery_data(lottery_type)
+            if df is None or df.empty:
+                self.log_box.append("数据为空，请先点击'加载分析数据'")
+                return
+            
+            # 确定红蓝球列
+            if lottery_type == 'dlt':
+                red_cols = [col for col in df.columns if col.startswith('红球_')][:5]
+                blue_cols = [col for col in df.columns if col.startswith('蓝球_')][:2]
+                red_count, blue_count = 5, 2
+                red_range, blue_range = 35, 12
+            else:
+                red_cols = [col for col in df.columns if col.startswith('红球_')][:6]
+                blue_cols = []
+                for col in df.columns:
+                    if col.startswith('蓝球_') or col == '蓝球':
+                        blue_cols.append(col)
+                        break
+                red_count, blue_count = 6, 1
+                red_range, blue_range = 33, 16
+            
+            # 计算各种指标
+            suggestions = []
+            total_periods = len(df)
+            
+            # 1. 频率分析 - 热冷号
+            red_freq = {}
+            for col in red_cols:
+                red_freq[col] = df[col].value_counts().to_dict()
+            
+            # 找出热号（出现频率 > 平均频率 * 1.2）和冷号（< 平均 * 0.8）
+            avg_freq = total_periods / red_range
+            hot_reds = []
+            cold_reds = []
+            for num in range(1, red_range + 1):
+                freq = sum(red_freq.get(col, {}).get(num, 0) for col in red_cols)
+                if freq > avg_freq * 1.2:
+                    hot_reds.append((num, freq))
+                elif freq < avg_freq * 0.8:
+                    cold_reds.append((num, freq))
+            
+            hot_reds.sort(key=lambda x: x[1], reverse=True)
+            cold_reds.sort(key=lambda x: x[1])
+            
+            if hot_reds:
+                top_hot = [str(n) for n, f in hot_reds[:5]]
+                suggestions.append(f"🔥 <b>热号关注</b>：红球 {', '.join(top_hot)} 近期出现频率显著高于平均（>{avg_freq:.1f}次），可考虑防守")
+            if cold_reds:
+                top_cold = [str(n) for n, f in cold_reds[:5]]
+                suggestions.append(f"❄️ <b>冷号补防</b>：红球 {', '.join(top_cold)} 长期出现偏少（<{avg_freq:.1f}次），理论回补概率较大")
+            
+            # 2. 遗漏分析
+            recent_n = min(20, total_periods)
+            recent_df = df.sort_values('期数', ascending=False).head(recent_n)
+            
+            missing_reds = []
+            for num in range(1, red_range + 1):
+                # 计算遗漏期数
+                missed = 0
+                for _, row in recent_df.iterrows():
+                    if num not in [row[c] for c in red_cols]:
+                        missed += 1
+                    else:
+                        break
+                if missed > recent_n * 0.5:  # 遗漏超过一半的近期
+                    missing_reds.append((num, missed))
+            
+            missing_reds.sort(key=lambda x: x[1], reverse=True)
+            if missing_reds:
+                top_missing = [f"{n}(遗漏{m}期)" for n, m in missing_reds[:4]]
+                suggestions.append(f"📊 <b>遗漏预警</b>：红球 {', '.join(top_missing)} 近{recent_n}期未开出，关注回补机会")
+            
+            # 3. 奇偶比分析
+            recent_20 = df.sort_values('期数', ascending=False).head(20)
+            odd_counts = []
+            for _, row in recent_20.iterrows():
+                reds = [row[c] for c in red_cols]
+                odd = sum(1 for r in reds if r % 2 == 1)
+                odd_counts.append(odd)
+            
+            avg_odd = sum(odd_counts) / len(odd_counts)
+            if avg_odd > red_count * 0.6:
+                suggestions.append(f"🔢 <b>奇偶趋势</b>：近20期红球奇数占比 {avg_odd/red_count:.0%}（理论50%），本期防偶数回补")
+            elif avg_odd < red_count * 0.4:
+                suggestions.append(f"🔢 <b>奇偶趋势</b>：近20期红球偶数占比 {(1-avg_odd/red_count):.0%}，本期防奇数回补")
+            
+            # 4. 大小比分析
+            mid = red_range // 2
+            large_counts = []
+            for _, row in recent_20.iterrows():
+                reds = [row[c] for c in red_cols]
+                large = sum(1 for r in reds if r > mid)
+                large_counts.append(large)
+            
+            avg_large = sum(large_counts) / len(large_counts)
+            if avg_large > red_count * 0.6:
+                suggestions.append(f"📈 <b>大小趋势</b>：近20期大号(>{mid})占比 {avg_large/red_count:.0%}，本期关注小号回补")
+            elif avg_large < red_count * 0.4:
+                suggestions.append(f"📈 <b>大小趋势</b>：近20期小号(≤{mid})占比 {(1-avg_large/red_count):.0%}，本期关注大号回补")
+            
+            # 5. 和值区间
+            sum_vals = []
+            for _, row in recent_20.iterrows():
+                reds = [row[c] for c in red_cols]
+                sum_vals.append(sum(reds))
+            
+            avg_sum = sum(sum_vals) / len(sum_vals)
+            min_sum = sum(range(1, red_count + 1))
+            max_sum = sum(range(red_range - red_count + 1, red_range + 1))
+            theoretical_avg = (min_sum + max_sum) / 2
+            
+            if avg_sum > theoretical_avg * 1.05:
+                suggestions.append(f"🎯 <b>和值参考</b>：近20期和值均值 {avg_sum:.0f} 偏高（理论{theoretical_avg:.0f}），建议关注 {int(theoretical_avg-10)}-{int(theoretical_avg+5)} 区间")
+            elif avg_sum < theoretical_avg * 0.95:
+                suggestions.append(f"🎯 <b>和值参考</b>：近20期和值均值 {avg_sum:.0f} 偏低（理论{theoretical_avg:.0f}），建议关注 {int(theoretical_avg-5)}-{int(theoretical_avg+10)} 区间")
+            else:
+                suggestions.append(f"🎯 <b>和值参考</b>：近20期和值均值 {avg_sum:.0f} 接近理论值 {theoretical_avg:.0f}，建议关注 {int(theoretical_avg-10)}-{int(theoretical_avg+10)} 区间")
+            
+            # 6. AC值（算术复杂度）
+            ac_vals = []
+            for _, row in recent_20.iterrows():
+                reds = sorted([row[c] for c in red_cols])
+                diffs = set()
+                for i in range(len(reds)):
+                    for j in range(i+1, len(reds)):
+                        diffs.add(reds[j] - reds[i])
+                ac = len(diffs) - (red_count - 1)
+                ac_vals.append(ac)
+            
+            avg_ac = sum(ac_vals) / len(ac_vals)
+            max_ac = red_count * (red_count - 1) // 2 - (red_count - 1)
+            suggestions.append(f"🔬 <b>AC值参考</b>：近20期平均AC值 {avg_ac:.1f}（范围0-{max_ac}），建议选号AC值在 {max(0, int(avg_ac-2))}-{int(avg_ac+2)} 之间")
+            
+            # 7. 蓝球建议
+            if blue_cols:
+                blue_col = blue_cols[0]
+                blue_freq = df[blue_col].value_counts().to_dict()
+                avg_b_freq = total_periods / blue_range
+                hot_blues = [(n, f) for n, f in blue_freq.items() if f > avg_b_freq * 1.3]
+                cold_blues = [(n, f) for n, f in blue_freq.items() if f < avg_b_freq * 0.7]
+                hot_blues.sort(key=lambda x: x[1], reverse=True)
+                cold_blues.sort(key=lambda x: x[1])
+                
+                if hot_blues:
+                    suggestions.append(f"🔵 <b>蓝球热号</b>：{', '.join(str(n) for n, _ in hot_blues[:3])} 频率偏高")
+                if cold_blues:
+                    suggestions.append(f"🔵 <b>蓝球冷号</b>：{', '.join(str(n) for n, _ in cold_blues[:3])} 长期未出，可做防守")
+            
+            # 显示建议
+            html = f"""
+            <h2 style='color:#C9702D;'>{lottery_name} 选号参考建议 <small>（基于近{total_periods}期历史数据）</small></h2>
+            <p style='color:#888;font-size:10pt;'>⚠️ 仅供娱乐参考，不构成投注建议，彩票本质是随机事件</p>
+            <hr style='border-color:#8B6F47;'>
+            """
+            
+            for i, s in enumerate(suggestions, 1):
+                html += f"<p style='font-size:11pt; margin:8px 0;'><b>{i}.</b> {s}</p>"
+            
+            html += f"""
+            <hr style='border-color:#8B6F47;'>
+            <p style='color:#888;font-size:10pt;'>
+            数据来源：{total_periods}期历史开奖 | 生成时间：{pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')} | 
+            理论中奖概率：双色球约1/1772万，大乐透约1/2142万
+            </p>
+            """
+            
+            # 显示在对应页面的结果区域
+            if hasattr(self, 'stats_result_label'):
+                self.stats_result_label.setText(html)
+            if hasattr(self, 'chart_label'):
+                self.chart_label.setText(html)
+            
+            self.log_box.append(f"✅ 生成选号参考完成，共 {len(suggestions)} 条建议")
+            
+        except Exception as e:
+            import traceback
+            self.log_box.append(f"生成选号参考出错：{str(e)}")
+            self.log_box.append(traceback.format_exc())
 
     def show_log_context_menu(self, position):
         """

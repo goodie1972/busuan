@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QPushButton, QLabel, QComboBox, QWidget, 
     QTextEdit, QSpinBox, QHBoxLayout, QTabWidget, QScrollArea, 
     QGridLayout, QCheckBox, QGroupBox, QFormLayout, QMainWindow,
-    QMenu, QAction
+    QMenu, QAction, QToolButton
 )
 from PyQt5.QtCore import Qt
 from theme_manager import ThemeManager, CustomThemeDialog
@@ -358,21 +358,54 @@ def create_analysis_tab(analysis_tab):
     
     analysis_layout.addLayout(analysis_content, 1)
     
-    # 添加加载数据按钮（在当前页面直接可用）
+    # --- 底部按钮区 ---
+    btn_layout = QHBoxLayout()
+    
+    # 主按钮：选号参考（醒目，主色调）
+    suggestion_button = QPushButton("💡 生成选号参考")
+    suggestion_button.setMinimumHeight(40)
+    suggestion_button.setStyleSheet("""
+        QPushButton {
+            font-size: 12pt; font-weight: bold; color: white;
+            background-color: #C9702D; border: none; border-radius: 4px;
+            padding: 8px 16px;
+        }
+        QPushButton:hover { background-color: #D4853E; }
+        QPushButton:pressed { background-color: #A65D24; }
+    """)
+    btn_layout.addWidget(suggestion_button)
+    
+    # 次级按钮：加载分析数据
     load_analysis_button = QPushButton("加载分析数据")
     load_analysis_button.setMinimumHeight(34)
     load_analysis_button.setStyleSheet(label_style)
-    analysis_layout.addWidget(load_analysis_button)
+    btn_layout.addWidget(load_analysis_button)
     
-    # 添加新的统计分析按钮
-    advanced_stats_button = QPushButton("高级统计分析")
-    analysis_layout.addWidget(advanced_stats_button)
+    # 折叠菜单：专业分析（隐藏复杂统计）
+    pro_menu = QMenu()
+    pro_menu.setStyleSheet("font-size: 11pt;")
+    action_advanced = QAction("高级统计分析", pro_menu)
+    action_distribution = QAction("分布分析", pro_menu)
+    pro_menu.addAction(action_advanced)
+    pro_menu.addAction(action_distribution)
     
-    distribution_analysis_button = QPushButton("分布分析")
-    analysis_layout.addWidget(distribution_analysis_button)
+    pro_button = QToolButton()
+    pro_button.setText("专业分析 ▼")
+    pro_button.setMinimumHeight(34)
+    pro_button.setStyleSheet(label_style)
+    pro_button.setMenu(pro_menu)
+    pro_button.setPopupMode(QToolButton.InstantPopup)
+    btn_layout.addWidget(pro_button)
+    
+    analysis_layout.addLayout(btn_layout)
+    
+    # 为了兼容性，保留原按钮引用（通过 menu actions 触发）
+    advanced_stats_button = action_advanced
+    distribution_analysis_button = action_distribution
     
     return (analysis_combo, trend_feature_combo, chart_label, stats_text,
-            advanced_stats_button, distribution_analysis_button, load_analysis_button)
+            advanced_stats_button, distribution_analysis_button, 
+            load_analysis_button, suggestion_button)
 
 
 def create_advanced_statistics_tab(advanced_stats_tab):
@@ -398,21 +431,50 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     lottery_combo = QComboBox()
     lottery_combo.addItems(["双色球", "大乐透"])
     
-    # 添加按钮
-    run_stats_button = QPushButton("运行高级统计分析")
-    run_distribution_button = QPushButton("运行分布分析")
+    # 主按钮：生成选号参考
+    suggestion_button = QPushButton("💡 生成选号参考")
+    suggestion_button.setMinimumHeight(40)
+    suggestion_button.setStyleSheet("""
+        QPushButton {
+            font-size: 12pt; font-weight: bold; color: white;
+            background-color: #C9702D; border: none; border-radius: 4px;
+            padding: 8px 16px;
+        }
+        QPushButton:hover { background-color: #D4853E; }
+        QPushButton:pressed { background-color: #A65D24; }
+    """)
+    
+    # 折叠菜单：专业分析
+    pro_menu = QMenu()
+    pro_menu.setStyleSheet("font-size: 11pt;")
+    action_advanced = QAction("运行高级统计分析", pro_menu)
+    action_distribution = QAction("运行分布分析", pro_menu)
+    pro_menu.addAction(action_advanced)
+    pro_menu.addAction(action_distribution)
+    
+    pro_button = QToolButton()
+    pro_button.setText("专业分析 ▼")
+    pro_button.setMinimumHeight(34)
+    pro_button.setStyleSheet("font-size: 11pt; padding: 6px 12px;")
+    pro_button.setMenu(pro_menu)
+    pro_button.setPopupMode(QToolButton.InstantPopup)
+    
+    # 显示详细统计数据按钮
     show_data_button = QPushButton("显示详细统计数据")
+    show_data_button.setMinimumHeight(34)
+    show_data_button.setStyleSheet("font-size: 11pt; padding: 6px 12px;")
     
     control_layout.addWidget(lottery_label)
     control_layout.addWidget(lottery_combo)
-    control_layout.addWidget(run_stats_button)
-    control_layout.addWidget(run_distribution_button)
+    control_layout.addWidget(suggestion_button)
+    control_layout.addWidget(pro_button)
     control_layout.addWidget(show_data_button)
+    control_layout.addStretch()
     
     advanced_layout.addLayout(control_layout)
     
     # 创建结果显示区域
-    result_label = QLabel("点击'运行高级统计分析'按钮查看统计分析结果")
+    result_label = QLabel("点击'生成选号参考'获取选号建议，或点击'专业分析'查看详细统计图表")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setMinimumHeight(500)
     result_label.setStyleSheet("padding: 10px; border: 1px solid #8B6F47; border-radius: 3px; font-size: 14pt; font-weight: bold;")
@@ -424,7 +486,11 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     
     advanced_layout.addWidget(scroll_area, 1)
     
-    return (lottery_combo, run_stats_button, run_distribution_button, show_data_button, result_label)
+    # 兼容性引用
+    run_stats_button = action_advanced
+    run_distribution_button = action_distribution
+    
+    return (lottery_combo, run_stats_button, run_distribution_button, show_data_button, result_label, suggestion_button)
 
 
 def create_expected_value_tab(expected_value_tab):
