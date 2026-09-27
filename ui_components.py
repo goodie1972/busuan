@@ -307,7 +307,9 @@ def create_analysis_tab(analysis_tab):
     analysis_layout.setSpacing(6)
     analysis_layout.setContentsMargins(8, 8, 8, 8)
     
-
+    # 统一按钮样式
+    label_style = "font-size: 11pt; padding: 6px 12px;"
+    
     analysis_control_layout = QHBoxLayout()
     
     chart_group = QGroupBox("图表选择")
@@ -356,6 +358,12 @@ def create_analysis_tab(analysis_tab):
     
     analysis_layout.addLayout(analysis_content, 1)
     
+    # 添加加载数据按钮（在当前页面直接可用）
+    load_analysis_button = QPushButton("加载分析数据")
+    load_analysis_button.setMinimumHeight(34)
+    load_analysis_button.setStyleSheet(label_style)
+    analysis_layout.addWidget(load_analysis_button)
+    
     # 添加新的统计分析按钮
     advanced_stats_button = QPushButton("高级统计分析")
     analysis_layout.addWidget(advanced_stats_button)
@@ -364,7 +372,7 @@ def create_analysis_tab(analysis_tab):
     analysis_layout.addWidget(distribution_analysis_button)
     
     return (analysis_combo, trend_feature_combo, chart_label, stats_text,
-            advanced_stats_button, distribution_analysis_button)
+            advanced_stats_button, distribution_analysis_button, load_analysis_button)
 
 
 def create_advanced_statistics_tab(advanced_stats_tab):

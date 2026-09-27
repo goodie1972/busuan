@@ -140,13 +140,14 @@ class LotteryPredictorApp(QMainWindow):
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
         self.analysis_combo, self.trend_feature_combo, self.chart_label, self.stats_text, \
-        self.advanced_stats_button, self.distribution_analysis_button = create_analysis_tab(self.analysis_tab)
+        self.advanced_stats_button, self.distribution_analysis_button, self.load_analysis_button = create_analysis_tab(self.analysis_tab)
         
         # 连接信号和槽
         self.analysis_combo.currentIndexChanged.connect(self.update_analysis_view)
         self.trend_feature_combo.currentIndexChanged.connect(lambda: self.update_analysis_view(4))
         self.advanced_stats_button.clicked.connect(self.show_advanced_statistics)
         self.distribution_analysis_button.clicked.connect(self.show_distribution_analysis)
+        self.load_analysis_button.clicked.connect(self.analyze_data)
         
         # 创建高级统计分析标签页
         self.advanced_stats_tab = QWidget()
@@ -807,8 +808,8 @@ class LotteryPredictorApp(QMainWindow):
     def show_advanced_statistics(self):
         """显示高级统计分析结果"""
         try:
-            # 切换到高级统计标签页
-            self.tab_widget.setCurrentIndex(2)
+            # 切换到高级统计标签页 (index 3)
+            self.tab_widget.setCurrentIndex(3)
             
             # 运行高级统计分析
             self.run_advanced_statistics()
@@ -819,8 +820,8 @@ class LotteryPredictorApp(QMainWindow):
     def show_distribution_analysis(self):
         """显示分布分析结果"""
         try:
-            # 切换到高级统计标签页
-            self.tab_widget.setCurrentIndex(2)
+            # 切换到高级统计标签页 (index 3)
+            self.tab_widget.setCurrentIndex(3)
             
             # 运行分布分析
             self.run_distribution_analysis()
