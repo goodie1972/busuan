@@ -40,170 +40,183 @@ def create_main_tab(main_tab):
         pass
     
 
-    top_widget = QWidget()
-    top_layout = QGridLayout()
-    
-
+    # ==================== 第一行：彩票类型 + 预测模型 ====================
+    row1 = QHBoxLayout()
+    row1.setSpacing(12)
     lottery_label = QLabel("彩票类型:")
     lottery_combo = QComboBox()
     lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
-    
-    model_label = QLabel("模型类型:")
+    model_label = QLabel("预测模型:")
     model_combo = QComboBox()
-
     model_combo.addItem("LSTM-CRF (默认)")
-
     from ml_models import MODEL_TYPES
     for model_key, model_name in MODEL_TYPES.items():
         model_combo.addItem(model_name)
-    
-    top_layout.addWidget(lottery_label, 0, 0)
-    top_layout.addWidget(lottery_combo, 0, 1)
-    top_layout.addWidget(model_label, 0, 2)
-    top_layout.addWidget(model_combo, 0, 3)
-    
+    row1.addWidget(lottery_label)
+    row1.addWidget(lottery_combo, 1)
+    row1.addSpacing(20)
+    row1.addWidget(model_label)
+    row1.addWidget(model_combo, 1)
+    row1.addStretch()
+    main_layout.addLayout(row1)
+
+    # ==================== 第二行：三张并排模式卡片 ====================
+    # 卡片通用样式
+    card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { subpadding-left: 10px; }"
+    label_style = "font-size: 10pt;"
+    spin_style = "font-size: 10pt; min-height: 24px;"
+
+    cards_layout = QHBoxLayout()
+    cards_layout.setSpacing(10)
+
+    # ---- 卡片1：单式 ----
+    single_card = QGroupBox("单式")
+    single_card.setStyleSheet(card_style)
+    single_card.setCheckable(True)
+    single_card.setChecked(True)  # 默认选中
+    single_v = QVBoxLayout(single_card)
+    single_v.setSpacing(8)
     prediction_label = QLabel("预测数量:")
+    prediction_label.setStyleSheet(label_style)
     prediction_spin = QSpinBox()
     prediction_spin.setRange(1, 10)
     prediction_spin.setValue(5)
-    
-    gpu_checkbox = QCheckBox("使用GPU训练")
-    gpu_checkbox.setChecked(cuda_available)
-    gpu_checkbox.setEnabled(cuda_available)
-    if not cuda_available:
-        gpu_checkbox.setToolTip("您的系统未安装GPU版本的PyTorch或没有可用的CUDA设备")
-    else:
-        gpu_checkbox.setToolTip(f"使用GPU加速训练 ({cuda_device})")
-    
-    predict_button = QPushButton("生成预测")
-    
-    top_layout.addWidget(prediction_label, 1, 0)
-    top_layout.addWidget(prediction_spin, 1, 1)
-    top_layout.addWidget(gpu_checkbox, 1, 2)
-    top_layout.addWidget(predict_button, 1, 3)
-    
-    main_layout.addWidget(top_widget)
-    
-  
-    theme_layout = QHBoxLayout()
-    theme_label = QLabel("主题样式:")
-    theme_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-    
-    theme_combo = QComboBox()
-    theme_combo.addItems(ThemeManager().get_theme_names())
-    theme_combo.setCurrentText(ThemeManager().current_theme)
-    
-    customize_theme_button = QPushButton("自定义主题")
-    
-    theme_layout.addStretch()
-    theme_layout.addWidget(theme_label)
-    theme_layout.addWidget(theme_combo)
-    theme_layout.addWidget(customize_theme_button)
-    
-    main_layout.addLayout(theme_layout)
-    
-  
-    control_layout = QHBoxLayout()
-    control_layout.setSpacing(10)
-    
-    settings_group = QGroupBox("预测设置")
-    settings_layout = QFormLayout(settings_group)
-    settings_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
-    settings_layout.setSpacing(6)
-    
-    settings_layout.addRow("彩票类型:", lottery_combo)
-    settings_layout.addRow("预测数量:", prediction_spin)
-    settings_layout.addRow("预测模型:", model_combo)
+    prediction_spin.setStyleSheet(spin_style)
+    single_v.addWidget(prediction_label)
+    single_v.addWidget(prediction_spin)
+    single_v.addStretch()
+    cards_layout.addWidget(single_card, 1)
 
-    # 预测模式：单式 / 复式 / 胆拖（互斥）
-    mode_combo = QComboBox()
-    mode_combo.addItems(["单式", "复式", "胆拖"])
-    settings_layout.addRow("预测模式:", mode_combo)
-
-    # 复式参数组
-    compound_widget = QWidget()
-    compound_layout = QFormLayout(compound_widget)
-    compound_layout.setContentsMargins(0, 0, 0, 0)
+    # ---- 卡片2：复式 ----
+    compound_card = QGroupBox("复式")
+    compound_card.setStyleSheet(card_style)
+    compound_card.setCheckable(True)
+    compound_card.setChecked(False)
+    compound_card.setEnabled(False)  # 未选中时禁用内部控件
+    compound_v = QVBoxLayout(compound_card)
+    compound_v.setSpacing(6)
     compound_red_spin = QSpinBox()
     compound_red_spin.setRange(0, 35)
-    compound_red_spin.setValue(0)
-    compound_red_spin.setToolTip("复式红球总数(如双色球填8 = 8个红球里选6，0 = 不启用)")
+    compound_red_spin.setValue(8)
+    compound_red_spin.setStyleSheet(spin_style)
+    compound_red_spin.setToolTip("复式红球总数(如双色球填8 = 8个红球里选6)")
     compound_blue_spin = QSpinBox()
     compound_blue_spin.setRange(0, 16)
-    compound_blue_spin.setValue(0)
-    compound_blue_spin.setToolTip("复式蓝球总数(如双色球填2 = 2个蓝球里选1，0 = 不启用)")
-    compound_layout.addRow("复式红球数:", compound_red_spin)
-    compound_layout.addRow("复式蓝球数:", compound_blue_spin)
-    compound_widget.setVisible(False)
-    settings_layout.addRow(compound_widget)
+    compound_blue_spin.setValue(2)
+    compound_blue_spin.setStyleSheet(spin_style)
+    compound_blue_spin.setToolTip("复式蓝球总数(如双色球填2 = 2个蓝球里选1)")
+    lbl_r = QLabel("红球数:"); lbl_r.setStyleSheet(label_style)
+    lbl_b = QLabel("蓝球数:"); lbl_b.setStyleSheet(label_style)
+    compound_v.addWidget(lbl_r)
+    compound_v.addWidget(compound_red_spin)
+    compound_v.addWidget(lbl_b)
+    compound_v.addWidget(compound_blue_spin)
+    compound_v.addStretch()
+    cards_layout.addWidget(compound_card, 1)
 
-    # 胆拖参数组
-    dantuo_widget = QWidget()
-    dantuo_layout = QFormLayout(dantuo_widget)
-    dantuo_layout.setContentsMargins(0, 0, 0, 0)
+    # ---- 卡片3：胆拖 ----
+    dantuo_card = QGroupBox("胆拖")
+    dantuo_card.setStyleSheet(card_style)
+    dantuo_card.setCheckable(True)
+    dantuo_card.setChecked(False)
+    dantuo_card.setEnabled(False)
+    dantuo_v = QVBoxLayout(dantuo_card)
+    dantuo_v.setSpacing(4)
     dt_red_dan = QSpinBox()
     dt_red_dan.setRange(1, 5)
     dt_red_dan.setValue(2)
+    dt_red_dan.setStyleSheet(spin_style)
     dt_red_dan.setToolTip("红球胆码个数(SSQ最多5, DLT最多4)")
     dt_red_tuo = QSpinBox()
     dt_red_tuo.setRange(1, 33)
     dt_red_tuo.setValue(6)
-    dt_red_tuo.setToolTip("红球拖码个数(剔除胆码后参与组合的号码数)")
+    dt_red_tuo.setStyleSheet(spin_style)
+    dt_red_tuo.setToolTip("红球拖码个数")
     dt_blue_dan = QSpinBox()
     dt_blue_dan.setRange(0, 2)
     dt_blue_dan.setValue(0)
+    dt_blue_dan.setStyleSheet(spin_style)
     dt_blue_dan.setToolTip("蓝球胆码个数(SSQ只能0, DLT最多1)")
     dt_blue_tuo = QSpinBox()
     dt_blue_tuo.setRange(1, 16)
     dt_blue_tuo.setValue(2)
-    dt_blue_tuo.setToolTip("蓝球拖码个数(SSQ单式只选1个蓝球，SSQ下蓝胆只能为0)")
-    dantuo_layout.addRow("红胆个数:", dt_red_dan)
-    dantuo_layout.addRow("红拖个数:", dt_red_tuo)
-    dantuo_layout.addRow("蓝胆个数:", dt_blue_dan)
-    dantuo_layout.addRow("蓝拖个数:", dt_blue_tuo)
-    dantuo_widget.setVisible(False)
-    settings_layout.addRow(dantuo_widget)
+    dt_blue_tuo.setStyleSheet(spin_style)
+    dt_blue_tuo.setToolTip("蓝球拖码个数")
+    for lbl, w in [("红胆:", dt_red_dan), ("红拖:", dt_red_tuo), ("蓝胆:", dt_blue_dan), ("蓝拖:", dt_blue_tuo)]:
+        l = QLabel(lbl); l.setStyleSheet(label_style)
+        dantuo_v.addWidget(l)
+        dantuo_v.addWidget(w)
+    dantuo_v.addStretch()
+    cards_layout.addWidget(dantuo_card, 1)
 
-    # 模式切换逻辑
-    def _on_mode_change(text):
-        compound_widget.setVisible(text == "复式")
-        dantuo_widget.setVisible(text == "胆拖")
-    mode_combo.currentTextChanged.connect(_on_mode_change)
+    main_layout.addLayout(cards_layout)
 
-    gpu_group = QGroupBox("GPU设置")
-    gpu_layout = QVBoxLayout(gpu_group)
-    gpu_layout.setSpacing(6)
-    
-    gpu_layout.addWidget(gpu_checkbox)
-    
-    control_layout.addWidget(settings_group, 2)
-    control_layout.addWidget(gpu_group, 1)
-    
-    main_layout.addLayout(control_layout)
-    
-   
+    # ==================== 模式互斥逻辑 ====================
+    mode_cards = {'单式': single_card, '复式': compound_card, '胆拖': dantuo_card}
+    # 用于外部读取当前模式的 QComboBox（保持返回值兼容）
+    mode_combo = QComboBox()
+    mode_combo.addItems(["单式", "复式", "胆拖"])
+    mode_combo.setVisible(False)  # 隐藏，仅作数据载体
+
+    def _on_card_toggled(checked_card):
+        """选中一张卡时取消其他两张"""
+        def _toggled(state):
+            if state:
+                for name, card in mode_cards.items():
+                    if card is not checked_card:
+                        card.blockSignals(True)
+                        card.setChecked(False)
+                        card.setEnabled(False)
+                        card.blockSignals(False)
+                checked_card.setEnabled(True)
+                mode_combo.setCurrentText(checked_card.title())
+        return _toggled
+
+    for card in mode_cards.values():
+        card.toggled.connect(_on_card_toggled(card))
+
+    # ==================== 第三行：主题 + GPU + 操作按钮 ====================
+    row3 = QHBoxLayout()
+    row3.setSpacing(8)
+    theme_label = QLabel("主题:")
+    theme_combo = QComboBox()
+    theme_combo.addItems(ThemeManager().get_theme_names())
+    theme_combo.setCurrentText(ThemeManager().current_theme)
+    customize_theme_button = QPushButton("自定义主题")
+    gpu_checkbox = QCheckBox("GPU训练")
+    gpu_checkbox.setChecked(cuda_available)
+    gpu_checkbox.setEnabled(cuda_available)
+    if not cuda_available:
+        gpu_checkbox.setToolTip("未检测到GPU版PyTorch")
+    else:
+        gpu_checkbox.setToolTip(f"GPU加速 ({cuda_device})")
+    row3.addWidget(theme_label)
+    row3.addWidget(theme_combo)
+    row3.addWidget(customize_theme_button)
+    row3.addSpacing(20)
+    row3.addWidget(gpu_checkbox)
+    row3.addStretch()
+    main_layout.addLayout(row3)
+
+    # 操作按钮行
     button_layout = QHBoxLayout()
     button_layout.setSpacing(6)
-    
+    predict_button = QPushButton("生成预测")
+    predict_button.setMinimumHeight(34)
     train_button = QPushButton("训练模型")
-    train_button.setMinimumHeight(30)
-    
+    train_button.setMinimumHeight(34)
     pause_button = QPushButton("暂停训练")
-    pause_button.setMinimumHeight(30)
+    pause_button.setMinimumHeight(34)
     pause_button.setEnabled(False)
-    
     analyze_button = QPushButton("数据分析")
-    analyze_button.setMinimumHeight(30)
-    
+    analyze_button.setMinimumHeight(34)
     update_data_button = QPushButton("更新数据")
-    update_data_button.setMinimumHeight(30)
-    
+    update_data_button.setMinimumHeight(34)
     button_layout.addWidget(predict_button)
     button_layout.addWidget(train_button)
     button_layout.addWidget(pause_button)
     button_layout.addWidget(analyze_button)
     button_layout.addWidget(update_data_button)
-    
     main_layout.addLayout(button_layout)
 
     
@@ -221,7 +234,7 @@ def create_main_tab(main_tab):
     # 预测结果字体：比默认大两个号并加粗
     from PyQt5.QtGui import QFont
     result_font = QFont(result_label.font())
-    result_font.setPointSize(result_font.pointSize() + 2)
+    result_font.setPointSize(result_font.pointSize() + 4)
     result_font.setBold(True)
     result_label.setFont(result_font)
     
@@ -460,7 +473,7 @@ def create_expected_value_tab(expected_value_tab):
     # 预测结果字体：比默认大两个号并加粗（与主预测页一致）
     from PyQt5.QtGui import QFont
     result_font = QFont(result_label.font())
-    result_font.setPointSize(result_font.pointSize() + 2)
+    result_font.setPointSize(result_font.pointSize() + 4)
     result_font.setBold(True)
     result_label.setFont(result_font)
     
