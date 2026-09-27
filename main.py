@@ -149,8 +149,48 @@ def train_model(lottery_type, model_type):
     
     return success
 
-def predict(lottery_type, model_type, compound_red=0, compound_blue=0):
+def predict(lottery_type, model_type, compound_red=0, compound_blue=0,
+            dantuo=False, dan_red=2, tuo_red=6, dan_blue=0, tuo_blue=2):
     """使用训练好的模型进行预测"""
+    # 胆拖预测：胆码固定 + 拖码组合
+    if dantuo:
+        logger.info(f"使用{model_type}模型胆拖预测{lottery_type}彩票...")
+        try:
+            from ml_models import LotteryMLModels
+            from scripts.data_analysis import load_lottery_data
+            ml_model = LotteryMLModels(lottery_type=lottery_type, model_type=model_type)
+            if not ml_model.load_models():
+                logger.error(f"模型{model_type}尚未训练，请先训练模型。")
+                return None
+            df = load_lottery_data(lottery_type)
+            recent_data = df.sort_values('期数', ascending=False).head(ml_model.feature_window)
+            r_dan, r_tuo, b_dan, b_tuo = ml_model.predict_dantuo(
+                recent_data, red_dan_count=dan_red, red_tuo_count=tuo_red,
+                blue_dan_count=dan_blue, blue_tuo_count=tuo_blue)
+            if r_dan is None:
+                logger.error("胆拖预测失败（期望值/xgboost 模型可能不支持）")
+                return None
+            from math import comb
+            red_pick = ml_model.red_count - len(r_dan)
+            blue_pick = ml_model.blue_count - len(b_dan)
+            n_notes = comb(len(r_tuo), red_pick) * \
+                (comb(len(b_tuo), blue_pick) if blue_pick > 0 else comb(len(b_tuo), ml_model.blue_count))
+            result = {
+                'dan_red': r_dan, 'tuo_red': r_tuo,
+                'dan_blue': b_dan, 'tuo_blue': b_tuo,
+                'notes': n_notes, 'amount': n_notes * 2,
+            }
+            logger.info(f"胆拖红胆({len(r_dan)}个): {r_dan}  红拖({len(r_tuo)}选{red_pick}): {r_tuo}")
+            if len(b_dan) > 0:
+                logger.info(f"胆拖蓝胆({len(b_dan)}个): {b_dan}  蓝拖({len(b_tuo)}选{blue_pick}): {b_tuo}")
+            else:
+                logger.info(f"胆拖蓝球({len(b_tuo)}选{ml_model.blue_count}): {b_tuo}")
+            logger.info(f"共 {n_notes} 注, 投注金额 {n_notes * 2} 元")
+            return result
+        except Exception as e:
+            logger.error(f"胆拖预测失败: {e}")
+            return None
+
     # 复式预测：直接调 predict_compound，输出号码池+注数（不走多组单式循环）
     if compound_red > 0 or compound_blue > 0:
         logger.info(f"使用{model_type}模型复式预测{lottery_type}彩票...")
@@ -261,6 +301,16 @@ def main():
                                help='复式红球总数(如ssq传8 = 8个红球里选6, 0=不启用)')
     predict_parser.add_argument('--compound-blue', type=int, default=0, metavar='N',
                                help='复式蓝球总数(如ssq传2 = 2个蓝球里选1, 0=不启用)')
+    predict_parser.add_argument('--dantuo', action='store_true',
+                               help='胆拖模式：胆码固定，拖码组合（与复式互斥）')
+    predict_parser.add_argument('--dan-red', type=int, default=2, metavar='N',
+                               help='胆拖红胆个数(SSQ 1-5, DLT 1-4)')
+    predict_parser.add_argument('--tuo-red', type=int, default=6, metavar='N',
+                               help='胆拖红拖个数')
+    predict_parser.add_argument('--dan-blue', type=int, default=0, metavar='N',
+                               help='胆拖蓝胆个数(SSQ只能0, DLT 0-1)')
+    predict_parser.add_argument('--tuo-blue', type=int, default=2, metavar='N',
+                               help='胆拖蓝拖个数')
     
     
     backtest_parser = subparsers.add_parser('backtest', help='历史数据回测')
@@ -291,7 +341,9 @@ def main():
         return train_model(args.lottery_type, args.model)
     elif args.command == 'predict':
         return predict(args.lottery_type, args.model,
-                       compound_red=args.compound_red, compound_blue=args.compound_blue)
+                       compound_red=args.compound_red, compound_blue=args.compound_blue,
+                       dantuo=args.dantuo, dan_red=args.dan_red, tuo_red=args.tuo_red,
+                       dan_blue=args.dan_blue, tuo_blue=args.tuo_blue)
     elif args.command == 'backtest':
         return run_backtest(args.lottery_type, args.model,
                             periods=args.periods, output=args.output)

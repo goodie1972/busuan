@@ -1779,30 +1779,16 @@ class LotteryMLModels:
             return None, None, None
         return result[0], result[1], getattr(self, 'last_confidence', None)
 
-    def predict_compound(self, recent_data, extra_red=0, extra_blue=0):
+    def _rank_balls(self, recent_data):
         """
-        预测复式号码：按模型概率排序（ensemble 为各子模型平均概率），
-        返回 top (red_count+extra_red) 红球 + top (blue_count+extra_blue) 蓝球，
-        而非单式的固定数量号码。确定性输出，不做随机扰动。
-
-        Args:
-            recent_data: 历史数据 DataFrame（与 predict 相同）
-            extra_red: 红球额外数量，复式红球数 = red_count + extra_red（上限为号码范围）
-            extra_blue: 蓝球额外数量，复式蓝球数 = blue_count + extra_blue
+        构建特征并按模型概率对全部号码排序（ensemble 取各子模型平均概率）。
+        复式/胆拖共用的底层逻辑。
 
         Returns:
-            (red_numbers, blue_numbers) 或 (None, None)
-            复式注数 = C(红球数, red_count) × C(蓝球数, blue_count)，金额 = 注数 × 2 元
+            (red_ranked, blue_ranked): 按概率从高到低排列的号码列表(1起) 或 (None, None)
         """
-        # 复式数量不能超过号码范围
-        red_need = min(self.red_count + extra_red, self.red_range)
-        blue_need = min(self.blue_count + extra_blue, self.blue_range)
-        if red_need <= self.red_count and blue_need <= self.blue_count:
-            self.log("复式数量未超出单式，退化为单式预测")
-            return self.predict(recent_data)
-
         if self.model_type == 'expected_value':
-            self.log("期望值模型不支持复式预测，请使用 ensemble/gbdt/lightgbm/catboost")
+            self.log("期望值模型不支持该预测方式，请使用 ensemble/gbdt/lightgbm/catboost")
             return None, None
 
         try:
@@ -1853,34 +1839,133 @@ class LotteryMLModels:
                 blue_proba = _class_proba_dict(self.models['blue'], X_scaled)
 
             if not red_proba or not blue_proba:
-                self.log("模型无概率输出，无法生成复式。xgboost(softmax)等模型不支持，请改用 ensemble/gbdt/lightgbm/catboost")
+                self.log("模型无概率输出。xgboost(softmax)等模型不支持，请改用 ensemble/gbdt/lightgbm/catboost")
                 return None, None
 
             red_ranked = sorted(red_proba.items(), key=lambda x: x[1], reverse=True)
             blue_ranked = sorted(blue_proba.items(), key=lambda x: x[1], reverse=True)
-            red_numbers = [int(p) + 1 for p, _ in red_ranked[:red_need]]
-            blue_numbers = [int(p) + 1 for p, _ in blue_ranked[:blue_need]]
-
-            # 数量不足时随机补充
-            while len(red_numbers) < red_need:
-                new_num = np.random.randint(1, self.red_range + 1)
-                if new_num not in red_numbers:
-                    red_numbers.append(new_num)
-            while len(blue_numbers) < blue_need:
-                new_num = np.random.randint(1, self.blue_range + 1)
-                if new_num not in blue_numbers:
-                    blue_numbers.append(new_num)
-
-            red_numbers = sorted(red_numbers)[:red_need]
-            blue_numbers = sorted(blue_numbers)[:blue_need]
-            n_notes = comb(red_need, self.red_count) * comb(blue_need, self.blue_count)
-            self.log(f"复式预测: 红球{red_need}个 + 蓝球{blue_need}个，共 {n_notes} 注（{n_notes * 2} 元）")
-            return red_numbers, blue_numbers
+            red_ranked = [int(p) + 1 for p, _ in red_ranked]
+            blue_ranked = [int(p) + 1 for p, _ in blue_ranked]
+            return red_ranked, blue_ranked
         except Exception as e:
-            self.log(f"复式预测出错: {e}")
+            self.log(f"号码概率排序出错: {e}")
             import traceback
             self.log(traceback.format_exc())
             return None, None
+
+    @staticmethod
+    def _pad_ranked(ranked, need, ball_range):
+        """概率排序号码不足 need 个时随机补充，保证不重复。"""
+        ranked = list(ranked)
+        while len(ranked) < need:
+            new_num = np.random.randint(1, ball_range + 1)
+            if new_num not in ranked:
+                ranked.append(new_num)
+        return ranked
+
+    def predict_compound(self, recent_data, extra_red=0, extra_blue=0):
+        """
+        预测复式号码：按模型概率排序（ensemble 为各子模型平均概率），
+        返回 top (red_count+extra_red) 红球 + top (blue_count+extra_blue) 蓝球，
+        而非单式的固定数量号码。确定性输出，不做随机扰动。
+
+        Args:
+            recent_data: 历史数据 DataFrame（与 predict 相同）
+            extra_red: 红球额外数量，复式红球数 = red_count + extra_red（上限为号码范围）
+            extra_blue: 蓝球额外数量，复式蓝球数 = blue_count + extra_blue
+
+        Returns:
+            (red_numbers, blue_numbers) 或 (None, None)
+            复式注数 = C(红球数, red_count) × C(蓝球数, blue_count)，金额 = 注数 × 2 元
+        """
+        # 复式数量不能超过号码范围
+        red_need = min(self.red_count + extra_red, self.red_range)
+        blue_need = min(self.blue_count + extra_blue, self.blue_range)
+        if red_need <= self.red_count and blue_need <= self.blue_count:
+            self.log("复式数量未超出单式，退化为单式预测")
+            return self.predict(recent_data)
+
+        red_ranked, blue_ranked = self._rank_balls(recent_data)
+        if red_ranked is None or blue_ranked is None:
+            return None, None
+
+        red_ranked = self._pad_ranked(red_ranked, red_need, self.red_range)
+        blue_ranked = self._pad_ranked(blue_ranked, blue_need, self.blue_range)
+        red_numbers = sorted(red_ranked[:red_need])
+        blue_numbers = sorted(blue_ranked[:blue_need])
+        n_notes = comb(red_need, self.red_count) * comb(blue_need, self.blue_count)
+        self.log(f"复式预测: 红球{red_need}个 + 蓝球{blue_need}个，共 {n_notes} 注（{n_notes * 2} 元）")
+        return red_numbers, blue_numbers
+
+    def predict_dantuo(self, recent_data, red_dan_count=2, red_tuo_count=6,
+                       blue_dan_count=1, blue_tuo_count=2):
+        """
+        预测胆拖号码：按模型概率排序，前 K 个作为胆码，接下来 N 个作为拖码。
+        注数 = C(红拖个数, 红球单式数-红胆个数) × C(蓝拖个数, 蓝球单式数-蓝胆个数)。
+
+        规则约束（自动截断）：
+        - 红胆 1 ~ red_count-1（胆码必须少于单式个数）
+        - 蓝胆 1 ~ blue_count-1（SSQ 蓝球单式只选 1 个，故 SSQ 不支持蓝胆）
+        - 拖码个数 >= 单式数-胆数，且 胆+拖 <= 号码范围
+
+        Args:
+            recent_data: 历史数据 DataFrame
+            red_dan_count: 红胆个数
+            red_tuo_count: 红拖个数
+            blue_dan_count: 蓝胆个数
+            blue_tuo_count: 蓝拖个数
+
+        Returns:
+            (red_dan, red_tuo, blue_dan, blue_tuo) 四元组，元素均为号码列表 或 (None, None, None, None)
+        """
+        red_dan_count = max(1, min(red_dan_count, self.red_count - 1))
+        blue_dan_count = max(1, min(blue_dan_count, self.blue_count - 1)) \
+            if self.blue_count >= 2 else 0
+        red_tuo_min = self.red_count - red_dan_count
+        blue_tuo_min = self.blue_count - blue_dan_count if blue_dan_count >= 1 else self.blue_count
+        red_tuo_count = max(red_tuo_min, min(red_tuo_count, self.red_range - red_dan_count))
+        blue_tuo_count = max(blue_tuo_min, min(blue_tuo_count, self.blue_range - blue_dan_count))
+
+        if blue_dan_count == 0 and blue_tuo_count > 0:
+            # SSQ 蓝球无胆拖空间（单式只选1个蓝球），退化为复式蓝球
+            self.log(f"{self.lottery_type} 蓝球单式只选1个，不支持蓝胆，蓝球按复式出号")
+            red_ranked, blue_ranked = self._rank_balls(recent_data)
+            if red_ranked is None or blue_ranked is None:
+                return None, None, None, None
+            red_total = red_dan_count + red_tuo_count
+            blue_need = min(blue_tuo_count, self.blue_range)
+            red_ranked = self._pad_ranked(red_ranked, red_total, self.red_range)
+            blue_ranked = self._pad_ranked(blue_ranked, blue_need, self.blue_range)
+            red_dan = sorted(red_ranked[:red_dan_count])
+            red_tuo = sorted(red_ranked[red_dan_count:red_total])
+            blue_tuo = sorted(blue_ranked[:blue_need])
+            n_notes = comb(red_tuo_count, self.red_count - red_dan_count) * comb(blue_need, 1)
+            self.log(
+                f"胆拖预测: 红胆{red_dan_count}个+红拖{red_tuo_count}个 / "
+                f"蓝拖{blue_need}个，共 {n_notes} 注（{n_notes * 2} 元）")
+            return red_dan, red_tuo, [], blue_tuo
+
+        red_ranked, blue_ranked = self._rank_balls(recent_data)
+        if red_ranked is None or blue_ranked is None:
+            return None, None, None, None
+
+        red_total = red_dan_count + red_tuo_count
+        blue_total = blue_dan_count + blue_tuo_count
+        red_ranked = self._pad_ranked(red_ranked, red_total, self.red_range)
+        blue_ranked = self._pad_ranked(blue_ranked, blue_total, self.blue_range)
+
+        red_dan = sorted(red_ranked[:red_dan_count])
+        red_tuo = sorted(red_ranked[red_dan_count:red_total])
+        blue_dan = sorted(blue_ranked[:blue_dan_count]) if blue_dan_count >= 1 else []
+        blue_tuo = sorted(blue_ranked[blue_dan_count:blue_total])
+
+        n_notes = comb(red_tuo_count, self.red_count - red_dan_count) * \
+            (comb(blue_tuo_count, self.blue_count - blue_dan_count) if blue_dan_count >= 1
+             else comb(blue_tuo_count, self.blue_count))
+        self.log(
+            f"胆拖预测: 红胆{red_dan_count}个+红拖{red_tuo_count}个 / "
+            f"蓝胆{blue_dan_count}个+蓝拖{blue_tuo_count}个，共 {n_notes} 注（{n_notes * 2} 元）")
+        return red_dan, red_tuo, blue_dan, blue_tuo
 
 # 使用示例
 def demo():

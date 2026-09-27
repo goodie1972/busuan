@@ -125,7 +125,8 @@ class LotteryPredictorApp(QMainWindow):
         self.predict_button, self.train_button, self.pause_button, self.analyze_button, self.update_data_button, \
         self.lottery_combo, self.prediction_spin, self.gpu_checkbox, self.result_label, self.log_box, \
         self.theme_combo, self.customize_theme_button, self.model_combo, \
-        self.compound_check, self.compound_red_spin, self.compound_blue_spin = create_main_tab(self.main_tab)
+        self.mode_combo, self.compound_red_spin, self.compound_blue_spin, \
+        self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -415,40 +416,73 @@ class LotteryPredictorApp(QMainWindow):
                 df = load_lottery_data(lottery_type)
                 recent_data = df.sort_values('期数', ascending=False).head(ml_model.feature_window)
                 
-                # 复式模式：按概率取前N个号码组成号码池，不走多组单式循环
-                if self.compound_check.isChecked():
+                predict_mode = self.mode_combo.currentText()
+                if predict_mode == "复式":
                     # 输入的是"总数"（如双色球红8 = 8选6），换算为额外个数
                     red_total = self.compound_red_spin.value()
                     blue_total = self.compound_blue_spin.value()
                     red_extra = max(red_total - ml_model.red_count, 0)
                     blue_extra = max(blue_total - ml_model.blue_count, 0)
-                    if red_extra > 0 or blue_extra > 0:
-                        red_numbers, blue_numbers = ml_model.predict_compound(
-                            recent_data, extra_red=red_extra, extra_blue=blue_extra)
-                        if red_numbers is None or blue_numbers is None:
-                            raise ValueError("复式预测失败（期望值/xgboost 模型可能不支持复式）")
-                        from math import comb
-                        n_notes = comb(len(red_numbers), ml_model.red_count) * \
-                            comb(len(blue_numbers), ml_model.blue_count)
-                        result_text = (
-                            f"【复式预测】{MODEL_TYPES[model_type]} 模型\n"
-                            f"最新期: {int(df['期数'].max())}\n"
-                            f"红球({len(red_numbers)}选{ml_model.red_count}): "
-                            f"{' '.join(map(str, red_numbers))}\n"
-                            f"蓝球({len(blue_numbers)}选{ml_model.blue_count}): "
-                            f"{' '.join(map(str, blue_numbers))}\n"
-                            f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
-                            f"（按模型概率从高到低取号；复式结果不写入核验存档）"
-                        )
-                        self.result_label.setText(result_text)
-                        self.log_emitter.new_log.emit(
-                            f"复式预测完成: 红{len(red_numbers)}选{ml_model.red_count} "
-                            f"蓝{len(blue_numbers)}选{ml_model.blue_count}，{n_notes}注/{n_notes * 2}元")
-                        return
+                    red_numbers, blue_numbers = ml_model.predict_compound(
+                        recent_data, extra_red=red_extra, extra_blue=blue_extra)
+                    if red_numbers is None or blue_numbers is None:
+                        raise ValueError("复式预测失败（期望值/xgboost 模型可能不支持复式）")
+                    from math import comb
+                    n_notes = comb(len(red_numbers), ml_model.red_count) * \
+                        comb(len(blue_numbers), ml_model.blue_count)
+                    result_text = (
+                        f"【复式预测】{MODEL_TYPES[model_type]} 模型\n"
+                        f"最新期: {int(df['期数'].max())}\n"
+                        f"红球({len(red_numbers)}选{ml_model.red_count}): "
+                        f"{' '.join(map(str, red_numbers))}\n"
+                        f"蓝球({len(blue_numbers)}选{ml_model.blue_count}): "
+                        f"{' '.join(map(str, blue_numbers))}\n"
+                        f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
+                        f"（按模型概率从高到低取号；复式结果不写入核验存档）"
+                    )
+                    self.result_label.setText(result_text)
+                    self.log_emitter.new_log.emit(
+                        f"复式预测完成: 红{len(red_numbers)}选{ml_model.red_count} "
+                        f"蓝{len(blue_numbers)}选{ml_model.blue_count}，{n_notes}注/{n_notes * 2}元")
+                    return
+
+                if predict_mode == "胆拖":
+                    red_dan = self.dt_red_dan.value()
+                    red_tuo = self.dt_red_tuo.value()
+                    blue_dan = self.dt_blue_dan.value()
+                    blue_tuo = self.dt_blue_tuo.value()
+                    r_dan, r_tuo, b_dan, b_tuo = ml_model.predict_dantuo(
+                        recent_data, red_dan_count=red_dan, red_tuo_count=red_tuo,
+                        blue_dan_count=blue_dan, blue_tuo_count=blue_tuo)
+                    if r_dan is None:
+                        raise ValueError("胆拖预测失败（期望值/xgboost 模型可能不支持胆拖）")
+                    from math import comb
+                    red_pick = ml_model.red_count - len(r_dan)
+                    blue_pick = ml_model.blue_count - len(b_dan)
+                    n_notes = comb(len(r_tuo), red_pick) * \
+                        (comb(len(b_tuo), blue_pick) if blue_pick > 0 else comb(len(b_tuo), ml_model.blue_count))
+                    dan_label = (
+                        f"红胆({len(r_dan)}个): {' '.join(map(str, r_dan))}  "
+                        f"红拖({len(r_tuo)}选{red_pick}): {' '.join(map(str, r_tuo))}\n")
+                    if len(b_dan) > 0:
+                        dan_label += (
+                            f"蓝胆({len(b_dan)}个): {' '.join(map(str, b_dan))}  "
+                            f"蓝拖({len(b_tuo)}选{blue_pick}): {' '.join(map(str, b_tuo))}\n")
                     else:
-                        self.log_emitter.new_log.emit(
-                            f"复式总数未超过单式（红{red_total}/{ml_model.red_count} 蓝{blue_total}/{ml_model.blue_count}），按单式生成预测")
-                
+                        dan_label += f"蓝球({len(b_tuo)}选{ml_model.blue_count}): {' '.join(map(str, b_tuo))}\n"
+                    result_text = (
+                        f"【胆拖预测】{MODEL_TYPES[model_type]} 模型\n"
+                        f"最新期: {int(df['期数'].max())}\n"
+                        f"{dan_label}"
+                        f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
+                        f"（胆码固定，拖码按模型概率排序；胆拖结果不写入核验存档）"
+                    )
+                    self.result_label.setText(result_text)
+                    self.log_emitter.new_log.emit(
+                        f"胆拖预测完成: 红胆{len(r_dan)}+红拖{len(r_tuo)} "
+                        f"蓝胆{len(b_dan)}+蓝拖{len(b_tuo)}，{n_notes}注/{n_notes * 2}元")
+                    return
+
                 for i in range(num_predictions):
                     red_predictions, blue_predictions = ml_model.predict(recent_data)
                     

@@ -115,8 +115,15 @@ def create_main_tab(main_tab):
     settings_layout.addRow("预测数量:", prediction_spin)
     settings_layout.addRow("预测模型:", model_combo)
 
-    compound_check = QCheckBox("复式模式")
-    compound_check.setToolTip("勾选后按模型概率取前N个号码组成号码池，而非单式固定数量")
+    # 预测模式：单式 / 复式 / 胆拖（互斥）
+    mode_combo = QComboBox()
+    mode_combo.addItems(["单式", "复式", "胆拖"])
+    settings_layout.addRow("预测模式:", mode_combo)
+
+    # 复式参数组
+    compound_widget = QWidget()
+    compound_layout = QFormLayout(compound_widget)
+    compound_layout.setContentsMargins(0, 0, 0, 0)
     compound_red_spin = QSpinBox()
     compound_red_spin.setRange(0, 35)
     compound_red_spin.setValue(0)
@@ -125,9 +132,43 @@ def create_main_tab(main_tab):
     compound_blue_spin.setRange(0, 16)
     compound_blue_spin.setValue(0)
     compound_blue_spin.setToolTip("复式蓝球总数(如双色球填2 = 2个蓝球里选1，0 = 不启用)")
-    settings_layout.addRow("复式模式:", compound_check)
-    settings_layout.addRow("复式红球数:", compound_red_spin)
-    settings_layout.addRow("复式蓝球数:", compound_blue_spin)
+    compound_layout.addRow("复式红球数:", compound_red_spin)
+    compound_layout.addRow("复式蓝球数:", compound_blue_spin)
+    compound_widget.setVisible(False)
+    settings_layout.addRow(compound_widget)
+
+    # 胆拖参数组
+    dantuo_widget = QWidget()
+    dantuo_layout = QFormLayout(dantuo_widget)
+    dantuo_layout.setContentsMargins(0, 0, 0, 0)
+    dt_red_dan = QSpinBox()
+    dt_red_dan.setRange(1, 5)
+    dt_red_dan.setValue(2)
+    dt_red_dan.setToolTip("红球胆码个数(SSQ最多5, DLT最多4)")
+    dt_red_tuo = QSpinBox()
+    dt_red_tuo.setRange(1, 33)
+    dt_red_tuo.setValue(6)
+    dt_red_tuo.setToolTip("红球拖码个数(剔除胆码后参与组合的号码数)")
+    dt_blue_dan = QSpinBox()
+    dt_blue_dan.setRange(0, 2)
+    dt_blue_dan.setValue(0)
+    dt_blue_dan.setToolTip("蓝球胆码个数(SSQ只能0, DLT最多1)")
+    dt_blue_tuo = QSpinBox()
+    dt_blue_tuo.setRange(1, 16)
+    dt_blue_tuo.setValue(2)
+    dt_blue_tuo.setToolTip("蓝球拖码个数(SSQ单式只选1个蓝球，SSQ下蓝胆只能为0)")
+    dantuo_layout.addRow("红胆个数:", dt_red_dan)
+    dantuo_layout.addRow("红拖个数:", dt_red_tuo)
+    dantuo_layout.addRow("蓝胆个数:", dt_blue_dan)
+    dantuo_layout.addRow("蓝拖个数:", dt_blue_tuo)
+    dantuo_widget.setVisible(False)
+    settings_layout.addRow(dantuo_widget)
+
+    # 模式切换逻辑
+    def _on_mode_change(text):
+        compound_widget.setVisible(text == "复式")
+        dantuo_widget.setVisible(text == "胆拖")
+    mode_combo.currentTextChanged.connect(_on_mode_change)
 
     gpu_group = QGroupBox("GPU设置")
     gpu_layout = QVBoxLayout(gpu_group)
@@ -207,7 +248,8 @@ def create_main_tab(main_tab):
     return (predict_button, train_button, pause_button, analyze_button, update_data_button,
             lottery_combo, prediction_spin, gpu_checkbox, result_label, log_box,
             theme_combo, customize_theme_button, model_combo,
-            compound_check, compound_red_spin, compound_blue_spin)
+            mode_combo, compound_red_spin, compound_blue_spin,
+            dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo)
 
 
 def create_analysis_tab(analysis_tab):
