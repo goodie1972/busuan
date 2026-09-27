@@ -70,7 +70,7 @@ def create_main_tab(main_tab):
 
     # ==================== 第二行：三张并排模式卡片 ====================
     # 卡片通用样式
-    card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { subpadding-left: 10px; }"
+    card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { padding-left: 10px; }"
 
     cards_layout = QHBoxLayout()
     cards_layout.setSpacing(10)
