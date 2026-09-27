@@ -177,6 +177,13 @@ class LotteryPredictorApp(QMainWindow):
         self.tab_widget.addTab(self.advanced_stats_tab, "高级统计")
         self.tab_widget.addTab(self.backtest_tab, "历史回测")
         
+        # 统一 tab 标签字体到 11pt
+        from PyQt5.QtGui import QFont
+        tab_font = QFont()
+        tab_font.setPointSize(11)
+        tab_font.setBold(True)
+        self.tab_widget.setFont(tab_font)
+        
         self.setCentralWidget(self.tab_widget)
         
         self.training_thread = None

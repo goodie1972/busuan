@@ -40,14 +40,22 @@ def create_main_tab(main_tab):
         pass
     
 
+    # ==================== 全局样式 ====================
+    label_style = "font-size: 11pt;"
+    spin_style = "font-size: 11pt; min-height: 26px;"
+
     # ==================== 第一行：彩票类型 + 预测模型 ====================
     row1 = QHBoxLayout()
     row1.setSpacing(12)
     lottery_label = QLabel("彩票类型:")
+    lottery_label.setStyleSheet(label_style)
     lottery_combo = QComboBox()
+    lottery_combo.setStyleSheet(spin_style)
     lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
     model_label = QLabel("预测模型:")
+    model_label.setStyleSheet(label_style)
     model_combo = QComboBox()
+    model_combo.setStyleSheet(spin_style)
     model_combo.addItem("LSTM-CRF (默认)")
     from ml_models import MODEL_TYPES
     for model_key, model_name in MODEL_TYPES.items():
@@ -63,8 +71,6 @@ def create_main_tab(main_tab):
     # ==================== 第二行：三张并排模式卡片 ====================
     # 卡片通用样式
     card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { subpadding-left: 10px; }"
-    label_style = "font-size: 10pt;"
-    spin_style = "font-size: 10pt; min-height: 24px;"
 
     cards_layout = QHBoxLayout()
     cards_layout.setSpacing(10)
@@ -92,7 +98,6 @@ def create_main_tab(main_tab):
     compound_card.setStyleSheet(card_style)
     compound_card.setCheckable(True)
     compound_card.setChecked(False)
-    compound_card.setEnabled(False)  # 未选中时禁用内部控件
     compound_v = QVBoxLayout(compound_card)
     compound_v.setSpacing(6)
     compound_red_spin = QSpinBox()
@@ -119,7 +124,6 @@ def create_main_tab(main_tab):
     dantuo_card.setStyleSheet(card_style)
     dantuo_card.setCheckable(True)
     dantuo_card.setChecked(False)
-    dantuo_card.setEnabled(False)
     dantuo_v = QVBoxLayout(dantuo_card)
     dantuo_v.setSpacing(4)
     dt_red_dan = QSpinBox()
@@ -159,16 +163,14 @@ def create_main_tab(main_tab):
     mode_combo.setVisible(False)  # 隐藏，仅作数据载体
 
     def _on_card_toggled(checked_card):
-        """选中一张卡时取消其他两张"""
+        """选中一张卡时取消其他两张（不禁用卡片本身，保持可点击）"""
         def _toggled(state):
             if state:
                 for name, card in mode_cards.items():
                     if card is not checked_card:
                         card.blockSignals(True)
                         card.setChecked(False)
-                        card.setEnabled(False)
                         card.blockSignals(False)
-                checked_card.setEnabled(True)
                 mode_combo.setCurrentText(checked_card.title())
         return _toggled
 
@@ -179,11 +181,15 @@ def create_main_tab(main_tab):
     row3 = QHBoxLayout()
     row3.setSpacing(8)
     theme_label = QLabel("主题:")
+    theme_label.setStyleSheet(label_style)
     theme_combo = QComboBox()
+    theme_combo.setStyleSheet(spin_style)
     theme_combo.addItems(ThemeManager().get_theme_names())
     theme_combo.setCurrentText(ThemeManager().current_theme)
     customize_theme_button = QPushButton("自定义主题")
+    customize_theme_button.setStyleSheet(label_style)
     gpu_checkbox = QCheckBox("GPU训练")
+    gpu_checkbox.setStyleSheet(label_style)
     gpu_checkbox.setChecked(cuda_available)
     gpu_checkbox.setEnabled(cuda_available)
     if not cuda_available:
@@ -203,15 +209,20 @@ def create_main_tab(main_tab):
     button_layout.setSpacing(6)
     predict_button = QPushButton("生成预测")
     predict_button.setMinimumHeight(34)
+    predict_button.setStyleSheet("font-size: 11pt; font-weight: bold;")
     train_button = QPushButton("训练模型")
     train_button.setMinimumHeight(34)
+    train_button.setStyleSheet(label_style)
     pause_button = QPushButton("暂停训练")
     pause_button.setMinimumHeight(34)
     pause_button.setEnabled(False)
+    pause_button.setStyleSheet(label_style)
     analyze_button = QPushButton("数据分析")
     analyze_button.setMinimumHeight(34)
+    analyze_button.setStyleSheet(label_style)
     update_data_button = QPushButton("更新数据")
     update_data_button.setMinimumHeight(34)
+    update_data_button.setStyleSheet(label_style)
     button_layout.addWidget(predict_button)
     button_layout.addWidget(train_button)
     button_layout.addWidget(pause_button)
