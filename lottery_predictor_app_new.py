@@ -105,7 +105,7 @@ class LotteryPredictorApp(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle(f"卜算 - 彩票娱乐软件 - GPU: {self.cuda_info}")
-        self.setGeometry(50, 50, 1920, 1360)
+        self.setGeometry(50, 50, 2112, 1360)
 
         self.tab_widget = QTabWidget()
         
@@ -136,6 +136,8 @@ class LotteryPredictorApp(QMainWindow):
         self.update_data_button.clicked.connect(self.update_lottery_data)
         self.theme_combo.currentTextChanged.connect(self.change_theme)
         self.customize_theme_button.clicked.connect(self.customize_theme)
+        # 模型切换时更新预测模式可用性
+        self.model_combo.currentTextChanged.connect(self.update_prediction_modes)
         
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
@@ -233,6 +235,36 @@ class LotteryPredictorApp(QMainWindow):
             else:
                 # 否则切换到自定义主题
                 self.theme_combo.setCurrentText("自定义")
+    
+    def update_prediction_modes(self):
+        """根据模型类型启用/禁用预测模式（单式/复式/胆拖）"""
+        model_text = self.model_combo.currentText()
+        # 不支持复式/胆拖的模型
+        unsupported_models = ["期望值模型", "XGBoost", "紫微斗数", "梅花易数"]
+        
+        is_unsupported = model_text in unsupported_models
+        
+        # 复式/胆拖相关控件
+        self.compound_red_spin.setEnabled(not is_unsupported)
+        self.compound_blue_spin.setEnabled(not is_unsupported)
+        self.dt_red_dan.setEnabled(not is_unsupported)
+        self.dt_red_tuo.setEnabled(not is_unsupported)
+        self.dt_blue_dan.setEnabled(not is_unsupported)
+        self.dt_blue_tuo.setEnabled(not is_unsupported)
+        
+        # 模式下拉框：如果是不支持的模型，强制选"单式"并禁用
+        if is_unsupported:
+            self.mode_combo.setCurrentText("单式")
+        self.mode_combo.setEnabled(not is_unsupported)
+        
+        # 训练按钮：紫微/梅花无需训练
+        no_train_models = ["紫微斗数", "梅花易数"]
+        self.train_button.setEnabled(model_text not in no_train_models)
+        
+        if is_unsupported:
+            self.log_emitter.new_log.emit(f"模型 {model_text} 仅支持单式预测，复式/胆拖已禁用")
+        elif model_text in no_train_models:
+            self.log_emitter.new_log.emit(f"模型 {model_text} 无需训练，直接预测")
 
     def train_model(self):
         selected_index = self.lottery_combo.currentIndex()
@@ -513,7 +545,8 @@ class LotteryPredictorApp(QMainWindow):
                     return
 
                 for i in range(num_predictions):
-                    red_predictions, blue_predictions = ml_model.predict(recent_data)
+                    # 传递 variation=i 给紫微/梅花等传统算法，生成不同结果
+                    red_predictions, blue_predictions = ml_model.predict(recent_data, variation=i)
                     
                     if red_predictions is None or blue_predictions is None:
                         raise ValueError(f"预测失败，请检查数据或重新训练模型。")
@@ -1623,9 +1656,9 @@ def predict_next_draw(lottery_type, model_type, num_predictions=5):
         # 结果列表
         results = []
         
-        for _ in range(num_predictions):
-            # 生成预测
-            red_predictions, blue_predictions = ml_model.predict(recent_data)
+        for i in range(num_predictions):
+            # 生成预测（传递 variation 给紫微/梅花）
+            red_predictions, blue_predictions = ml_model.predict(recent_data, variation=i)
             
             if red_predictions is None or blue_predictions is None:
                 print(f"预测失败，请检查数据或重新训练模型。")

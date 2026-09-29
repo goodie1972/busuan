@@ -4838,5 +4838,1061 @@
     "blue_hits": null,
     "prize_name": null,
     "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T20:43:22",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      10,
+      16,
+      23,
+      24,
+      26,
+      27
+    ],
+    "blue_numbers": [
+      9
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T20:43:22",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      19,
+      22,
+      24,
+      27,
+      29,
+      33
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T20:43:22",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      6,
+      7,
+      12,
+      19,
+      23,
+      31
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T20:43:22",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      5,
+      8,
+      17,
+      20,
+      21,
+      23
+    ],
+    "blue_numbers": [
+      12
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T20:43:22",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      7,
+      18,
+      23,
+      25,
+      29,
+      30
+    ],
+    "blue_numbers": [
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:03:56",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      5,
+      10,
+      18,
+      23,
+      24,
+      31
+    ],
+    "blue_numbers": [
+      13
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:03:56",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      12,
+      20,
+      23,
+      26,
+      30,
+      33
+    ],
+    "blue_numbers": [
+      7
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:03:56",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      3,
+      9,
+      13,
+      19,
+      20,
+      21
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:03:56",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      2,
+      4,
+      21,
+      22,
+      23,
+      29
+    ],
+    "blue_numbers": [
+      13
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:03:56",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      6,
+      14,
+      16,
+      17,
+      19,
+      23
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:15:58",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      1,
+      5,
+      17,
+      19,
+      22,
+      23
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:15:58",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      5,
+      13,
+      16,
+      19,
+      22,
+      23
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:15:58",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      6,
+      7,
+      8,
+      12,
+      23,
+      33
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:15:58",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      2,
+      20,
+      21,
+      23,
+      29,
+      32
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-27T21:15:58",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      8,
+      11,
+      19,
+      23,
+      32,
+      33
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      8,
+      10,
+      11,
+      13,
+      25
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      2,
+      8,
+      10,
+      11,
+      19
+    ],
+    "blue_numbers": [
+      1,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      8,
+      9,
+      10,
+      11,
+      33
+    ],
+    "blue_numbers": [
+      1,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      8,
+      10,
+      11,
+      23,
+      34
+    ],
+    "blue_numbers": [
+      1,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      8,
+      10,
+      11,
+      20,
+      32
+    ],
+    "blue_numbers": [
+      1,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:34:14",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      8,
+      11,
+      15,
+      20
+    ],
+    "blue_numbers": [
+      1,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:05",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      10,
+      14,
+      23,
+      32
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T10:35:19",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      11,
+      12,
+      17,
+      25,
+      32
+    ],
+    "blue_numbers": [
+      6,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:38:33",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      5,
+      9,
+      12,
+      23,
+      31,
+      33
+    ],
+    "blue_numbers": [
+      12
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:38:33",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      6,
+      10,
+      12,
+      23,
+      30,
+      32
+    ],
+    "blue_numbers": [
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:38:33",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      8,
+      9,
+      10,
+      23,
+      24,
+      26
+    ],
+    "blue_numbers": [
+      6
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:38:33",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      5,
+      10,
+      20,
+      23,
+      31,
+      33
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:38:33",
+    "lottery_type": "ssq",
+    "model_type": "gbdt",
+    "latest_period": 26110,
+    "red_numbers": [
+      13,
+      14,
+      17,
+      23,
+      25,
+      29
+    ],
+    "blue_numbers": [
+      16
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:03",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      2,
+      9,
+      11,
+      20,
+      33
+    ],
+    "blue_numbers": [
+      4,
+      5
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:03",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      4,
+      6,
+      11,
+      19,
+      28
+    ],
+    "blue_numbers": [
+      1,
+      2
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:03",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      5,
+      7,
+      12,
+      20,
+      33
+    ],
+    "blue_numbers": [
+      2,
+      3
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:03",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      5,
+      6,
+      12,
+      19,
+      32
+    ],
+    "blue_numbers": [
+      3,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:03",
+    "lottery_type": "dlt",
+    "model_type": "ziwei",
+    "latest_period": 26111,
+    "red_numbers": [
+      4,
+      9,
+      11,
+      18,
+      31
+    ],
+    "blue_numbers": [
+      5,
+      6
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:27",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      4,
+      11,
+      12,
+      18,
+      20
+    ],
+    "blue_numbers": [
+      4,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:27",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      2,
+      12,
+      16,
+      23,
+      30
+    ],
+    "blue_numbers": [
+      1,
+      8
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:27",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      7,
+      12,
+      21,
+      28,
+      35
+    ],
+    "blue_numbers": [
+      5,
+      10
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:27",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      5,
+      12,
+      16,
+      19,
+      33
+    ],
+    "blue_numbers": [
+      2,
+      7
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-09-29T20:53:27",
+    "lottery_type": "dlt",
+    "model_type": "meihua",
+    "latest_period": 26111,
+    "red_numbers": [
+      3,
+      12,
+      21,
+      24,
+      31
+    ],
+    "blue_numbers": [
+      3,
+      4
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
   }
 ]
