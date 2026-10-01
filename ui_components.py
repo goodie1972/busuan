@@ -896,9 +896,9 @@ def create_meihua_tab(meihua_tab):
     form = QFormLayout()
     form.setSpacing(6)
 
-    mode_combo = QComboBox()
-    mode_combo.addItems(["时间起卦", "数字起卦"])
-    mode_combo.setStyleSheet(input_style)
+    # 直觉数字勾选框：默认不勾选（时间起卦），勾选后才能编辑数字
+    num_check = QCheckBox("使用直觉数字起卦（打钩后可输入数字）")
+    num_check.setStyleSheet("font-size: 11pt; font-weight: bold;")
 
     year_spin = QSpinBox()
     year_spin.setRange(1900, 2100)
@@ -926,23 +926,26 @@ def create_meihua_tab(meihua_tab):
     num1_spin.setRange(1, 999)
     num1_spin.setValue(3)
     num1_spin.setStyleSheet(input_style)
+    num1_spin.setEnabled(False)  # 默认禁用
 
     num2_spin = QSpinBox()
     num2_spin.setRange(1, 999)
     num2_spin.setValue(8)
     num2_spin.setStyleSheet(input_style)
+    num2_spin.setEnabled(False)
 
     num3_spin = QSpinBox()
     num3_spin.setRange(1, 999)
     num3_spin.setValue(15)
     num3_spin.setStyleSheet(input_style)
+    num3_spin.setEnabled(False)
 
     target_spin = QSpinBox()
     target_spin.setRange(0, 99999)
     target_spin.setValue(0)
     target_spin.setStyleSheet(input_style)
 
-    form.addRow("起卦方式:", mode_combo)
+    form.addRow(num_check)
     form.addRow("年:", year_spin)
     form.addRow("月:", month_combo)
     form.addRow("日:", day_spin)
@@ -1009,7 +1012,7 @@ def create_meihua_tab(meihua_tab):
     main_layout.addWidget(result_group, 1)
 
     return (predict_btn, reset_btn,
-            mode_combo, year_spin, month_combo, day_spin,
+            num_check, year_spin, month_combo, day_spin,
             hour_combo, minute_combo,
             num1_spin, num2_spin, num3_spin, target_spin,
             cards)

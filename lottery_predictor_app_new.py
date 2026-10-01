@@ -198,12 +198,18 @@ class LotteryPredictorApp(QMainWindow):
         # ===== 梅花易数标签页 =====
         self.meihua_tab = QWidget()
         (self.mh_predict_btn, self.mh_reset_btn,
-         self.mh_mode, self.mh_year, self.mh_month, self.mh_day,
+         self.mh_num_check, self.mh_year, self.mh_month, self.mh_day,
          self.mh_hour, self.mh_minute,
          self.mh_num1, self.mh_num2, self.mh_num3, self.mh_target,
          self.mh_cards) = create_meihua_tab(self.meihua_tab)
         self.mh_predict_btn.clicked.connect(self.generate_meihua_prediction)
         self.mh_reset_btn.clicked.connect(self.reset_meihua)
+        # 勾选「直觉数字」时才启用三个数字输入框
+        self.mh_num_check.toggled.connect(
+            lambda checked: [self.mh_num1.setEnabled(checked),
+                             self.mh_num2.setEnabled(checked),
+                             self.mh_num3.setEnabled(checked)]
+        )
         self.tab_widget.addTab(self.meihua_tab, "梅花易数")
         
         # 统一 tab 标签字体到 11pt，并加 padding/高度防截断
@@ -791,18 +797,18 @@ class LotteryPredictorApp(QMainWindow):
             lottery_text = self.lottery_combo.currentText()
             lottery_type = 'ssq' if '双色' in lottery_text or 'ssq' in lottery_text.lower() else 'dlt'
 
-            # 构造输入信息
-            mode_text = self.mh_mode.currentText()
+            # 构造输入信息：根据勾选框决定模式
+            use_number = self.mh_num_check.isChecked()
             input_info = {
-                'mode': 'number' if '数字' in mode_text else 'time',
+                'mode': 'number' if use_number else 'time',
                 'year': self.mh_year.value(),
                 'month': int(self.mh_month.currentText()),
                 'day': self.mh_day.value(),
                 'hour': int(self.mh_hour.currentText().replace('时', '')),
                 'minute': int(self.mh_minute.currentText().replace('分', '')),
-                'num1': self.mh_num1.value(),
-                'num2': self.mh_num2.value(),
-                'num3': self.mh_num3.value(),
+                'num1': self.mh_num1.value() if use_number else 0,
+                'num2': self.mh_num2.value() if use_number else 0,
+                'num3': self.mh_num3.value() if use_number else 0,
             }
 
             # 获取最新期号
@@ -840,7 +846,7 @@ class LotteryPredictorApp(QMainWindow):
                 detail_label.setText(interp)
 
             self.log_emitter.new_log.emit(
-                f"梅花起卦完成: {mode_text} → 3组号码已生成")
+                f"梅花起卦完成: {'数字起卦' if use_number else '时间起卦'} → 3组号码已生成")
         except Exception as e:
             self.log_emitter.new_log.emit(f"梅花起卦失败: {e}")
 
