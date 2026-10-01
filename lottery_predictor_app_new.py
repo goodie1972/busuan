@@ -18,7 +18,8 @@ from PyQt5.QtWidgets import (
     QMenu, QAction
 )
 from PyQt5.QtCore import pyqtSignal, QObject, QThread, Qt, QTimer
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QTextDocument
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 
 
 from model_utils import (
@@ -218,10 +219,100 @@ class LotteryPredictorApp(QMainWindow):
             }
         """)
         
+        # ===== 为所有标签页添加「复制结果」+「打印结果」按钮 =====
+        self._add_copy_print_buttons()
+
         self.setCentralWidget(self.tab_widget)
         
         self.training_thread = None
         self.is_training_paused = False
+
+    def _add_copy_print_buttons(self):
+        """为每个有结果的标签页添加「复制结果」+「打印结果」按钮"""
+        # (tab_widget, result_extractor_name, tab_label)
+        tabs = [
+            (self.main_tab, 'main', '预测'),
+            (self.expectedvalue_tab, 'ev', '期望值模型'),
+            (self.analysis_tab, 'analysis', '数据分析'),
+            (self.advanced_stats_tab, 'advanced', '高级统计'),
+            (self.backtest_tab, 'backtest', '历史回测'),
+            (self.ziwei_tab, 'ziwei', '紫微斗数'),
+            (self.meihua_tab, 'meihua', '梅花易数'),
+        ]
+        for widget, key, label in tabs:
+            layout = widget.layout()
+            if layout is None:
+                continue
+            btn_layout = QHBoxLayout()
+            btn_layout.addStretch()
+            copy_btn = QPushButton(f"📋 复制{label}结果")
+            copy_btn.setStyleSheet("font-size: 11pt; padding: 6px 16px;")
+            print_btn = QPushButton(f"🖨 打印{label}结果")
+            print_btn.setStyleSheet("font-size: 11pt; padding: 6px 16px;")
+            # 用 lambda 捕获 key
+            copy_btn.clicked.connect(lambda _, k=key: self._copy_result(k))
+            print_btn.clicked.connect(lambda _, k=key: self._print_result(k))
+            btn_layout.addWidget(copy_btn)
+            btn_layout.addWidget(print_btn)
+            layout.addLayout(btn_layout)
+
+    def _get_tab_result_text(self, tab_key):
+        """提取指定标签页的结果文本"""
+        text = ""
+        if tab_key == 'main':
+            text = self.result_label.text()
+        elif tab_key == 'ev':
+            text = self.ev_result_label.text()
+        elif tab_key == 'analysis':
+            text = self.stats_text.toPlainText()
+        elif tab_key == 'advanced':
+            text = self.stats_result_label.text()
+        elif tab_key == 'backtest':
+            text = self.bt_result_text.toPlainText()
+        elif tab_key == 'ziwei':
+            lines = ["═══ 紫微斗数排盘结果 ═══"]
+            for i, (rl, bl, dl) in enumerate(self.zw_cards):
+                lines.append(f"\n【第{i+1}组】")
+                lines.append(f"  {rl.text()}")
+                lines.append(f"  {bl.text()}")
+                lines.append(f"  {dl.text()}")
+            text = "\n".join(lines)
+        elif tab_key == 'meihua':
+            lines = ["═══ 梅花易数起卦结果 ═══"]
+            for i, (rl, bl, dl) in enumerate(self.mh_cards):
+                lines.append(f"\n【第{i+1}组】")
+                lines.append(f"  {rl.text()}")
+                lines.append(f"  {bl.text()}")
+                lines.append(f"  {dl.text()}")
+            text = "\n".join(lines)
+        return text.strip() if text else "(暂无结果)"
+
+    def _copy_result(self, tab_key):
+        """复制结果到系统剪贴板"""
+        text = self._get_tab_result_text(tab_key)
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        self.statusBar().showMessage(f"已复制结果到剪贴板 ({len(text)} 字符)", 3000)
+
+    def _print_result(self, tab_key):
+        """打印结果"""
+        text = self._get_tab_result_text(tab_key)
+        if not text or text == "(暂无结果)":
+            self.statusBar().showMessage("暂无结果可打印", 3000)
+            return
+        # 先弹出打印对话框
+        printer = QPrinter()
+        dialog = QPrintDialog(printer, self)
+        dialog.setWindowTitle(f"打印{tab_key}结果")
+        if dialog.exec_() != QPrintDialog.Accepted:
+            return
+        # 用 QTextDocument 渲染到 printer
+        doc = QTextDocument()
+        # 添加标题
+        title = f"卜算 - {tab_key} 结果\n生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n{'='*50}\n\n"
+        doc.setPlainText(title + text)
+        doc.print_(printer)
+        self.statusBar().showMessage("打印已发送", 3000)
 
     def apply_theme(self):
         """应用当前选择的主题"""
