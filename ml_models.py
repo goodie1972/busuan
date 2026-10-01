@@ -1998,143 +1998,79 @@ class LotteryMLModels:
 
     def _predict_ziwei(self, recent_data, variation=0):
         """
-        紫微斗数预测 - 基于出生时间/当前时间的星曜分布
-        简化版：用当前时间和最新期数起卦，取主星化权/禄/科/忌对应号码
-        variation: 第几组预测（0-based），用于生成不同结果
+        紫微斗数预测 - 调用 astrology.ziwei 引擎
+        三组取数视角：0=正财(财帛宫) 1=偏财(官禄+迁移+福德) 2=本命(命宫+身宫+大限)
         """
         import datetime
-        import hashlib
-        
+        from astrology.ziwei.engine import predict as ziwei_predict
+
         self.log(f"使用紫微斗数排盘预测... (第{variation+1}组)")
-        
-        # 获取当前时间和最新期数
+
         now = datetime.datetime.now()
         latest_period = int(recent_data.iloc[0]['期数']) if len(recent_data) > 0 else 0
-        
-        # 构造起卦种子：年月日时 + 最新期数 + variation
-        seed_str = f"{now.year}{now.month:02d}{now.day:02d}{now.hour:02d}{latest_period}{variation}"
-        seed_hash = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-        
-        # 紫微十四主星对应号码映射（简化版）
-        # 将星曜化权/禄/科/忌映射到彩票号码范围
-        ziwei_stars = [
-            "紫微", "天机", "太阳", "武曲", "天同", "廉贞",
-            "天府", "太阴", "贪狼", "巨门", "天相", "天梁", "七杀", "破军"
-        ]
-        
-        # 用种子生成确定性的星曜分布
-        np.random.seed(seed_hash)
-        
-        # 红球预测：选取化权、禄、科的星曜对应号码
-        red_numbers = set()
-        
-        # 紫微斗数核心：命宫、身宫、财帛宫、官禄宫、迁移宫、福德宫
-        palaces = ["命宫", "兄弟", "夫妻", "子女", "财帛", "疾厄", "迁移", "奴仆", "官禄", "田宅", "福德", "父母"]
-        
-        # 为每个宫位分配星曜，取前 red_count 个
-        for i, palace in enumerate(palaces):
-            if len(red_numbers) >= self.red_count:
-                break
-            # 星曜落宫算法简化
-            star_idx = (seed_hash + i * 7 + variation * 11) % 14
-            star_num = (star_idx + 1) % self.red_range + 1
-            red_numbers.add(star_num)
-        
-        # 如果不足，用化忌星补齐
-        while len(red_numbers) < self.red_count:
-            extra = (seed_hash + len(red_numbers) * 13 + variation * 17) % self.red_range + 1
-            red_numbers.add(extra)
-        
-        # 蓝球预测：基于福德宫、迁移宫
-        blue_numbers = set()
-        for i in range(self.blue_count):
-            blue_num = (seed_hash + i * 11 + 100 + variation * 19) % self.blue_range + 1
-            blue_numbers.add(blue_num)
-        
-        red_result = sorted(list(red_numbers))[:self.red_count]
-        blue_result = sorted(list(blue_numbers))[:self.blue_count]
-        
-        self.log(f"紫微斗数预测: 红球 {red_result} 蓝球 {blue_result} (种子: {seed_str})")
-        return red_result, blue_result
+
+        birth_info = getattr(self, 'birth_info', None) or {
+            'year': now.year, 'month': now.month, 'day': now.day,
+            'hour': now.hour, 'minute': now.minute,
+            'city': '北京', 'gender': '男'
+        }
+
+        red, blue, interp = ziwei_predict(
+            lottery_type=self.lottery_type,
+            red_range=self.red_range, blue_range=self.blue_range,
+            red_count=self.red_count, blue_count=self.blue_count,
+            birth_info=birth_info,
+            target_period=latest_period,
+            variation=variation,
+        )
+
+        self.log(f"紫微斗数预测: 红球 {red} 蓝球 {blue}")
+        if not hasattr(self, '_astrology_interp'):
+            self._astrology_interp = []
+        if variation < 3:
+            while len(self._astrology_interp) <= variation:
+                self._astrology_interp.append('')
+            self._astrology_interp[variation] = interp
+
+        return red, blue
 
     def _predict_meihua(self, recent_data, variation=0):
         """
-        梅花易数预测 - 邵雍《梅花易数》核心算法
-        体用卦、互卦、变卦三重推演
-        variation: 第几组预测（0-based），用于生成不同结果
+        梅花易数预测 - 调用 astrology.meihua 引擎
+        三组取数路径：0=本卦主象 1=互卦过程 2=外应灵数
         """
         import datetime
-        import hashlib
-        
+        from astrology.meihua.engine import predict as meihua_predict
+
         self.log(f"使用梅花易数起卦预测... (第{variation+1}组)")
-        
+
         now = datetime.datetime.now()
         latest_period = int(recent_data.iloc[0]['期数']) if len(recent_data) > 0 else 0
-        
-        # 梅花易数起卦法：年月日时 + 期数 + variation
-        # 上卦 = (年 + 月 + 日) % 8，下卦 = (年 + 月 + 日 + 时) % 8
-        # 动爻 = (年 + 月 + 日 + 时 + 分) % 6
-        
-        upper = (now.year + now.month + now.day + variation) % 8
-        lower = (now.year + now.month + now.day + now.hour + variation) % 8
-        moving = (now.year + now.month + now.day + now.hour + now.minute + variation) % 6
-        
-        # 八卦序数：乾1兑2离3震4巽5坎6艮7坤0
-        bagua = [0, 1, 2, 3, 4, 5, 6, 7]  # 坤乾兑离震巽坎艮
-        
-        upper_gua = bagua[upper]
-        lower_gua = bagua[lower]
-        
-        # 体卦（本卦）+ 用卦（变卦）
-        # 生成确定性种子
-        seed_str = f"{upper_gua}{lower_gua}{moving}{latest_period}{variation}"
-        seed_hash = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-        
-        np.random.seed(seed_hash)
-        
-        # 梅花易数：体卦为主，用卦为辅，互卦为过程
-        # 取体卦上下卦数、动爻数、互卦数作为核心数字
-        core_numbers = [
-            upper_gua + 1,      # 上卦数 1-8
-            lower_gua + 1,      # 下卦数 1-8
-            moving + 1,         # 动爻 1-6
-            (upper_gua + lower_gua) % 8 + 1,  # 互卦上
-            (lower_gua + moving) % 8 + 1,     # 互卦下
-            (upper_gua + moving) % 8 + 1,     # 变卦上
-            (lower_gua + upper_gua + moving) % 8 + 1,  # 变卦下
-        ]
-        
-        # 映射到彩票号码范围
-        red_numbers = set()
-        for num in core_numbers:
-            if len(red_numbers) >= self.red_count:
-                break
-            # 扩展到红球范围
-            mapped = (num * 7 + 3 + variation * 5) % self.red_range + 1  # 简单扩展映射
-            red_numbers.add(mapped)
-        
-        # 体用结合：用最新期数干支配合
-        period_num = latest_period % 60  # 六十甲子
-        red_numbers.add((period_num % self.red_range) + 1)
-        
-        # 补齐
-        while len(red_numbers) < self.red_count:
-            extra = (seed_hash + len(red_numbers) * 17 + variation * 23) % self.red_range + 1
-            red_numbers.add(extra)
-        
-        # 蓝球：坎卦(水)主智慧，艮卦(山)主止
-        blue_numbers = set()
-        blue_base = [(upper_gua + 1) % self.blue_range + 1, (lower_gua + 1) % self.blue_range + 1]
-        for i in range(self.blue_count):
-            b = (blue_base[i % 2] + moving + i * 3 + variation * 7) % self.blue_range + 1
-            blue_numbers.add(b)
-        
-        red_result = sorted(list(red_numbers))[:self.red_count]
-        blue_result = sorted(list(blue_numbers))[:self.blue_count]
-        
-        self.log(f"梅花易数预测: 红球 {red_result} 蓝球 {blue_result} (本卦{upper_gua}{lower_gua} 动爻{moving+1})")
-        return red_result, blue_result
 
+        input_info = getattr(self, 'meihua_info', None) or {
+            'mode': 'time',
+            'year': now.year, 'month': now.month, 'day': now.day,
+            'hour': now.hour, 'minute': now.minute,
+        }
+
+        red, blue, interp = meihua_predict(
+            lottery_type=self.lottery_type,
+            red_range=self.red_range, blue_range=self.blue_range,
+            red_count=self.red_count, blue_count=self.blue_count,
+            input_info=input_info,
+            target_period=latest_period,
+            variation=variation,
+        )
+
+        self.log(f"梅花易数预测: 红球 {red} 蓝球 {blue}")
+        if not hasattr(self, '_astrology_interp'):
+            self._astrology_interp = []
+        if variation < 3:
+            while len(self._astrology_interp) <= variation:
+                self._astrology_interp.append('')
+            self._astrology_interp[variation] = interp
+
+        return red, blue
 # 使用示例
 def demo():
     # 加载数据

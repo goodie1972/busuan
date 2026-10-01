@@ -36,7 +36,8 @@ from prediction_utils import (
 from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
-    create_expected_value_tab, create_backtest_tab
+    create_expected_value_tab, create_backtest_tab,
+    create_ziwei_tab, create_meihua_tab
 )
 from data_processing import (
     process_analysis_data, get_trend_features, prepare_recent_trend_data,
@@ -182,6 +183,27 @@ class LotteryPredictorApp(QMainWindow):
         self.tab_widget.addTab(self.analysis_tab, "数据分析")
         self.tab_widget.addTab(self.advanced_stats_tab, "高级统计")
         self.tab_widget.addTab(self.backtest_tab, "历史回测")
+        
+        # ===== 紫微斗数标签页 =====
+        self.ziwei_tab = QWidget()
+        (self.zw_predict_btn, self.zw_reset_btn,
+         self.zw_name, self.zw_gender, self.zw_year, self.zw_month,
+         self.zw_day, self.zw_hour, self.zw_minute, self.zw_city, self.zw_target,
+         self.zw_cards) = create_ziwei_tab(self.ziwei_tab)
+        self.zw_predict_btn.clicked.connect(self.generate_ziwei_prediction)
+        self.zw_reset_btn.clicked.connect(self.reset_ziwei)
+        self.tab_widget.addTab(self.ziwei_tab, "紫微斗数")
+        
+        # ===== 梅花易数标签页 =====
+        self.meihua_tab = QWidget()
+        (self.mh_predict_btn, self.mh_reset_btn,
+         self.mh_mode, self.mh_year, self.mh_month, self.mh_day,
+         self.mh_hour, self.mh_minute,
+         self.mh_num1, self.mh_num2, self.mh_num3, self.mh_target,
+         self.mh_cards) = create_meihua_tab(self.meihua_tab)
+        self.mh_predict_btn.clicked.connect(self.generate_meihua_prediction)
+        self.mh_reset_btn.clicked.connect(self.reset_meihua)
+        self.tab_widget.addTab(self.meihua_tab, "梅花易数")
         
         # 统一 tab 标签字体到 11pt，并加 padding/高度防截断
         from PyQt5.QtGui import QFont
@@ -599,6 +621,145 @@ class LotteryPredictorApp(QMainWindow):
         except Exception as e:
             self.log_emitter.new_log.emit(
                 f"预测记录存档失败(不影响预测): {e}")
+
+    def generate_ziwei_prediction(self):
+        """紫微斗数排盘预测：3组号码"""
+        try:
+            from astrology.ziwei.engine import predict as ziwei_predict
+            import pandas as pd
+
+            # 获取彩种
+            lottery_text = self.lottery_combo.currentText()
+            lottery_type = 'ssq' if '双色' in lottery_text or 'ssq' in lottery_text.lower() else 'dlt'
+
+            # 构造出生信息
+            birth_info = {
+                'year': self.zw_year.value(),
+                'month': int(self.zw_month.currentText()),
+                'day': self.zw_day.value(),
+                'hour': int(self.zw_hour.currentText().replace('时', '')),
+                'minute': int(self.zw_minute.currentText().replace('分', '')),
+                'city': self.zw_city.currentText(),
+                'gender': self.zw_gender.currentText(),
+            }
+
+            # 获取最新期号
+            target_period = self.zw_target.value()
+            if target_period == 0:
+                try:
+                    from scripts.data_analysis import load_lottery_data
+                    df = load_lottery_data(lottery_type)
+                    target_period = int(df['期数'].max())
+                except Exception:
+                    target_period = 0
+
+            # 彩种配置
+            if lottery_type == 'ssq':
+                red_range, blue_range, red_count, blue_count = 33, 16, 6, 1
+            else:
+                red_range, blue_range, red_count, blue_count = 35, 12, 5, 2
+
+            # 生成3组
+            for v in range(3):
+                red, blue, interp = ziwei_predict(
+                    lottery_type=lottery_type,
+                    red_range=red_range, blue_range=blue_range,
+                    red_count=red_count, blue_count=blue_count,
+                    birth_info=birth_info,
+                    target_period=target_period,
+                    variation=v,
+                )
+                red_label, blue_label, detail_label = self.zw_cards[v]
+                red_label.setText(f"红球: {' '.join(f'{n:02d}' for n in red)}")
+                if lottery_type == 'ssq':
+                    blue_label.setText(f"蓝球: {blue[0]:02d}")
+                else:
+                    blue_label.setText(f"蓝球: {' '.join(f'{n:02d}' for n in blue)}")
+                detail_label.setText(interp)
+
+            self.log_emitter.new_log.emit(
+                f"紫微排盘完成: {birth_info['year']}年{birth_info['month']}月{birth_info['day']}日 "
+                f"{birth_info['hour']}时 {birth_info['city']} {birth_info['gender']} → 3组号码已生成")
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"紫微排盘失败: {e}")
+
+    def reset_ziwei(self):
+        """重置紫微结果"""
+        for i in range(3):
+            red_label, blue_label, detail_label = self.zw_cards[i]
+            red_label.setText("红球: 待排盘")
+            blue_label.setText("蓝球: 待排盘")
+            detail_label.setText("推演: 待排盘")
+
+    def generate_meihua_prediction(self):
+        """梅花易数起卦预测：3组号码"""
+        try:
+            from astrology.meihua.engine import predict as meihua_predict
+
+            # 获取彩种
+            lottery_text = self.lottery_combo.currentText()
+            lottery_type = 'ssq' if '双色' in lottery_text or 'ssq' in lottery_text.lower() else 'dlt'
+
+            # 构造输入信息
+            mode_text = self.mh_mode.currentText()
+            input_info = {
+                'mode': 'number' if '数字' in mode_text else 'time',
+                'year': self.mh_year.value(),
+                'month': int(self.mh_month.currentText()),
+                'day': self.mh_day.value(),
+                'hour': int(self.mh_hour.currentText().replace('时', '')),
+                'minute': int(self.mh_minute.currentText().replace('分', '')),
+                'num1': self.mh_num1.value(),
+                'num2': self.mh_num2.value(),
+                'num3': self.mh_num3.value(),
+            }
+
+            # 获取最新期号
+            target_period = self.mh_target.value()
+            if target_period == 0:
+                try:
+                    from scripts.data_analysis import load_lottery_data
+                    df = load_lottery_data(lottery_type)
+                    target_period = int(df['期数'].max())
+                except Exception:
+                    target_period = 0
+
+            # 彩种配置
+            if lottery_type == 'ssq':
+                red_range, blue_range, red_count, blue_count = 33, 16, 6, 1
+            else:
+                red_range, blue_range, red_count, blue_count = 35, 12, 5, 2
+
+            # 生成3组
+            for v in range(3):
+                red, blue, interp = meihua_predict(
+                    lottery_type=lottery_type,
+                    red_range=red_range, blue_range=blue_range,
+                    red_count=red_count, blue_count=blue_count,
+                    input_info=input_info,
+                    target_period=target_period,
+                    variation=v,
+                )
+                red_label, blue_label, detail_label = self.mh_cards[v]
+                red_label.setText(f"红球: {' '.join(f'{n:02d}' for n in red)}")
+                if lottery_type == 'ssq':
+                    blue_label.setText(f"蓝球: {blue[0]:02d}")
+                else:
+                    blue_label.setText(f"蓝球: {' '.join(f'{n:02d}' for n in blue)}")
+                detail_label.setText(interp)
+
+            self.log_emitter.new_log.emit(
+                f"梅花起卦完成: {mode_text} → 3组号码已生成")
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"梅花起卦失败: {e}")
+
+    def reset_meihua(self):
+        """重置梅花结果"""
+        for i in range(3):
+            red_label, blue_label, detail_label = self.mh_cards[i]
+            red_label.setText("红球: 待起卦")
+            blue_label.setText("蓝球: 待起卦")
+            detail_label.setText("卦象: 待起卦")
 
     def verify_prediction_records(self):
         """核验预测记录：统计实际生成过的预测的中奖情况"""
@@ -1113,11 +1274,21 @@ class LotteryPredictorApp(QMainWindow):
     def generate_analysis_suggestions(self):
         """生成选号参考建议 - 将统计指标翻译成人话"""
         try:
-            # 获取当前彩票类型
-            if hasattr(self, 'current_lottery_type') and self.current_lottery_type:
+            # 获取当前彩票类型 - 根据调用源确定使用哪个下拉框
+            sender = self.sender()
+            if sender == self.analysis_suggestion_button:
+                # 数据分析页面：用 analysis_combo
+                selected_index = self.analysis_combo.currentIndex()
+                selected_key = list(name_path.keys())[selected_index]
+                lottery_type = selected_key
+            elif sender == self.adv_stats_suggestion_button:
+                # 高级统计页面：用 advanced_stats_lottery_combo (显示名"双色球"/"大乐透")
+                display_name = self.advanced_stats_lottery_combo.currentText()
+                lottery_type = 'ssq' if display_name == '双色球' else 'dlt'
+            elif hasattr(self, 'current_lottery_type') and self.current_lottery_type:
                 lottery_type = self.current_lottery_type
             else:
-                # 从主界面获取
+                # 兜底：主界面
                 selected_index = self.lottery_combo.currentIndex()
                 selected_key = list(name_path.keys())[selected_index]
                 lottery_type = selected_key

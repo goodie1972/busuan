@@ -339,7 +339,12 @@ def create_analysis_tab(analysis_tab):
     chart_label = QLabel("请先点击'数据分析'按钮加载数据")
     chart_label.setAlignment(Qt.AlignCenter)
     chart_label.setMinimumHeight(350)
-    chart_label.setStyleSheet("border: 1px dashed #CCCCCC; background-color: white;")
+    chart_label.setStyleSheet("""
+        QLabel {
+            border: 1px dashed #8B6F47; 
+            border-radius: 3px;
+        }
+    """)
     
     chart_layout.addWidget(chart_label)
     
@@ -477,7 +482,15 @@ def create_advanced_statistics_tab(advanced_stats_tab):
     result_label = QLabel("点击'生成选号参考'获取选号建议，或点击'专业分析'查看详细统计图表")
     result_label.setAlignment(Qt.AlignCenter)
     result_label.setMinimumHeight(500)
-    result_label.setStyleSheet("padding: 10px; border: 1px solid #8B6F47; border-radius: 3px; font-size: 14pt; font-weight: bold;")
+    result_label.setStyleSheet("""
+        QLabel {
+            padding: 10px; 
+            border: 1px solid #8B6F47; 
+            border-radius: 3px; 
+            font-size: 14pt; 
+            font-weight: bold;
+        }
+    """)
     
     # 使用QScrollArea包裹结果显示区域，以支持滚动
     scroll_area = QScrollArea()
@@ -718,4 +731,285 @@ def create_main_window():
         LotteryPredictorApp: 主窗口实例
     """
     from lottery_predictor_app_new import LotteryPredictorApp
-    return LotteryPredictorApp() 
+    return LotteryPredictorApp()
+
+
+def create_ziwei_tab(ziwei_tab):
+    """
+    创建紫微斗数标签页
+    
+    输入：姓名/性别/出生年月日时/城市/目标期号
+    输出：3组号码（正财/偏财/本命三视角）
+    """
+    from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QFormLayout, QPushButton,
+                                  QLabel, QComboBox, QSpinBox, QLineEdit, QGroupBox,
+                                  QTextEdit, QScrollArea, QFrame)
+    from PyQt5.QtGui import QFont
+    from astrology.common.cities import get_city_names
+
+    main_layout = QVBoxLayout(ziwei_tab)
+    main_layout.setSpacing(8)
+    main_layout.setContentsMargins(12, 12, 12, 12)
+
+    label_style = "font-size: 11pt; font-weight: bold;"
+    input_style = "font-size: 11pt; min-height: 30px;"
+
+    # ==================== 输入区 ====================
+    input_group = QGroupBox("排盘信息")
+    form = QFormLayout()
+    form.setSpacing(6)
+
+    name_edit = QLineEdit()
+    name_edit.setPlaceholderText("选填")
+    name_edit.setStyleSheet(input_style)
+
+    gender_combo = QComboBox()
+    gender_combo.addItems(["男", "女"])
+    gender_combo.setStyleSheet(input_style)
+
+    year_spin = QSpinBox()
+    year_spin.setRange(1900, 2100)
+    year_spin.setValue(1990)
+    year_spin.setStyleSheet(input_style)
+
+    month_combo = QComboBox()
+    month_combo.addItems([str(m) for m in range(1, 13)])
+    month_combo.setStyleSheet(input_style)
+
+    day_spin = QSpinBox()
+    day_spin.setRange(1, 31)
+    day_spin.setValue(1)
+    day_spin.setStyleSheet(input_style)
+
+    hour_combo = QComboBox()
+    hour_combo.addItems([f"{h:02d}时" for h in range(24)])
+    hour_combo.setStyleSheet(input_style)
+
+    minute_combo = QComboBox()
+    minute_combo.addItems([f"{m:02d}分" for m in range(0, 60, 5)])
+    minute_combo.setStyleSheet(input_style)
+
+    city_combo = QComboBox()
+    city_combo.addItems(get_city_names())
+    city_combo.setCurrentText("北京")
+    city_combo.setStyleSheet(input_style)
+    city_combo.setEditable(True)
+
+    target_spin = QSpinBox()
+    target_spin.setRange(0, 99999)
+    target_spin.setValue(0)
+    target_spin.setStyleSheet(input_style)
+
+    form.addRow("姓名:", name_edit)
+    form.addRow("性别:", gender_combo)
+    form.addRow("出生年:", year_spin)
+    form.addRow("出生月:", month_combo)
+    form.addRow("出生日:", day_spin)
+    form.addRow("出生时:", hour_combo)
+    form.addRow("出生分:", minute_combo)
+    form.addRow("出生城市:", city_combo)
+    form.addRow("目标期号(0=自动):", target_spin)
+
+    input_group.setLayout(form)
+    main_layout.addWidget(input_group)
+
+    # ==================== 操作按钮 ====================
+    btn_layout = QHBoxLayout()
+    btn_layout.setSpacing(8)
+    predict_btn = QPushButton("紫微排盘·取数")
+    predict_btn.setMinimumHeight(38)
+    predict_btn.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    reset_btn = QPushButton("重置")
+    reset_btn.setMinimumHeight(38)
+    reset_btn.setStyleSheet(label_style)
+    btn_layout.addWidget(predict_btn)
+    btn_layout.addWidget(reset_btn)
+    btn_layout.addStretch()
+    main_layout.addLayout(btn_layout)
+
+    # ==================== 结果展示区 ====================
+    result_group = QGroupBox("紫微三组号码")
+    result_layout = QVBoxLayout()
+
+    # 3 张组卡片
+    cards = []
+    variation_names = ["第一组·正财视角", "第二组·偏财视角", "第三组·本命视角"]
+    for i, vname in enumerate(variation_names):
+        card_frame = QFrame()
+        card_frame.setFrameStyle(QFrame.Box)
+        card_layout = QVBoxLayout(card_frame)
+        card_layout.setContentsMargins(10, 6, 10, 6)
+
+        title_label = QLabel(vname)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        card_layout.addWidget(title_label)
+
+        red_label = QLabel("红球: 待排盘")
+        red_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        card_layout.addWidget(red_label)
+
+        blue_label = QLabel("蓝球: 待排盘")
+        blue_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        card_layout.addWidget(blue_label)
+
+        detail_label = QLabel("推演: 待排盘")
+        detail_label.setStyleSheet("font-size: 10pt;")
+        detail_label.setWordWrap(True)
+        card_layout.addWidget(detail_label)
+
+        cards.append((red_label, blue_label, detail_label))
+        result_layout.addWidget(card_frame)
+
+    result_group.setLayout(result_layout)
+    main_layout.addWidget(result_group, 1)
+
+    return (predict_btn, reset_btn,
+            name_edit, gender_combo, year_spin, month_combo,
+            day_spin, hour_combo, minute_combo, city_combo, target_spin,
+            cards)
+
+
+def create_meihua_tab(meihua_tab):
+    """
+    创建梅花易数标签页
+    
+    输入：起卦方式(时间/数字) + 对应参数
+    输出：3组号码（本卦主象/互卦过程/外应灵数）
+    """
+    from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QFormLayout, QPushButton,
+                                  QLabel, QComboBox, QSpinBox, QLineEdit, QGroupBox,
+                                  QFrame)
+    from PyQt5.QtGui import QFont
+
+    main_layout = QVBoxLayout(meihua_tab)
+    main_layout.setSpacing(8)
+    main_layout.setContentsMargins(12, 12, 12, 12)
+
+    label_style = "font-size: 11pt; font-weight: bold;"
+    input_style = "font-size: 11pt; min-height: 30px;"
+
+    # ==================== 输入区 ====================
+    input_group = QGroupBox("起卦信息")
+    form = QFormLayout()
+    form.setSpacing(6)
+
+    mode_combo = QComboBox()
+    mode_combo.addItems(["时间起卦", "数字起卦"])
+    mode_combo.setStyleSheet(input_style)
+
+    year_spin = QSpinBox()
+    year_spin.setRange(1900, 2100)
+    year_spin.setValue(2026)
+    year_spin.setStyleSheet(input_style)
+
+    month_combo = QComboBox()
+    month_combo.addItems([str(m) for m in range(1, 13)])
+    month_combo.setStyleSheet(input_style)
+
+    day_spin = QSpinBox()
+    day_spin.setRange(1, 31)
+    day_spin.setValue(1)
+    day_spin.setStyleSheet(input_style)
+
+    hour_combo = QComboBox()
+    hour_combo.addItems([f"{h:02d}时" for h in range(24)])
+    hour_combo.setStyleSheet(input_style)
+
+    minute_combo = QComboBox()
+    minute_combo.addItems([f"{m:02d}分" for m in range(0, 60, 5)])
+    minute_combo.setStyleSheet(input_style)
+
+    num1_spin = QSpinBox()
+    num1_spin.setRange(1, 999)
+    num1_spin.setValue(3)
+    num1_spin.setStyleSheet(input_style)
+
+    num2_spin = QSpinBox()
+    num2_spin.setRange(1, 999)
+    num2_spin.setValue(8)
+    num2_spin.setStyleSheet(input_style)
+
+    num3_spin = QSpinBox()
+    num3_spin.setRange(1, 999)
+    num3_spin.setValue(15)
+    num3_spin.setStyleSheet(input_style)
+
+    target_spin = QSpinBox()
+    target_spin.setRange(0, 99999)
+    target_spin.setValue(0)
+    target_spin.setStyleSheet(input_style)
+
+    form.addRow("起卦方式:", mode_combo)
+    form.addRow("年:", year_spin)
+    form.addRow("月:", month_combo)
+    form.addRow("日:", day_spin)
+    form.addRow("时:", hour_combo)
+    form.addRow("分:", minute_combo)
+    form.addRow("数字1(数字起卦用):", num1_spin)
+    form.addRow("数字2(数字起卦用):", num2_spin)
+    form.addRow("数字3(数字起卦用):", num3_spin)
+    form.addRow("目标期号(0=自动):", target_spin)
+
+    input_group.setLayout(form)
+    main_layout.addWidget(input_group)
+
+    # ==================== 操作按钮 ====================
+    btn_layout = QHBoxLayout()
+    btn_layout.setSpacing(8)
+    predict_btn = QPushButton("梅花起卦·取数")
+    predict_btn.setMinimumHeight(38)
+    predict_btn.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    reset_btn = QPushButton("重置")
+    reset_btn.setMinimumHeight(38)
+    reset_btn.setStyleSheet(label_style)
+    btn_layout.addWidget(predict_btn)
+    btn_layout.addWidget(reset_btn)
+    btn_layout.addStretch()
+    main_layout.addLayout(btn_layout)
+
+    # ==================== 结果展示区 ====================
+    result_group = QGroupBox("梅花三组号码")
+    result_layout = QVBoxLayout()
+
+    cards = []
+    variation_names = ["第一组·本卦主象", "第二组·互卦过程", "第三组·外应灵数"]
+    for i, vname in enumerate(variation_names):
+        card_frame = QFrame()
+        card_frame.setFrameStyle(QFrame.Box)
+        card_layout = QVBoxLayout(card_frame)
+        card_layout.setContentsMargins(10, 6, 10, 6)
+
+        title_label = QLabel(vname)
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        card_layout.addWidget(title_label)
+
+        red_label = QLabel("红球: 待起卦")
+        red_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        card_layout.addWidget(red_label)
+
+        blue_label = QLabel("蓝球: 待起卦")
+        blue_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        card_layout.addWidget(blue_label)
+
+        detail_label = QLabel("卦象: 待起卦")
+        detail_label.setStyleSheet("font-size: 10pt;")
+        detail_label.setWordWrap(True)
+        card_layout.addWidget(detail_label)
+
+        cards.append((red_label, blue_label, detail_label))
+        result_layout.addWidget(card_frame)
+
+    result_group.setLayout(result_layout)
+    main_layout.addWidget(result_group, 1)
+
+    return (predict_btn, reset_btn,
+            mode_combo, year_spin, month_combo, day_spin,
+            hour_combo, minute_combo,
+            num1_spin, num2_spin, num3_spin, target_spin,
+            cards)
