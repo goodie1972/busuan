@@ -100,6 +100,10 @@ class LotteryPredictorApp(QMainWindow):
         # 保存统计数据窗口的引用
         self.stats_window = None
         
+        # 投注计划管理相关
+        self.investment_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                           'investment_history.json')
+        
         # 连接日志框的自定义右键菜单信号
         self.log_box.customContextMenuRequested.connect(self.show_log_context_menu)
         
@@ -220,6 +224,28 @@ class LotteryPredictorApp(QMainWindow):
         )
         self.tab_widget.addTab(self.meihua_tab, "梅花易数")
         
+        # ===== 投注计划管理标签页 =====
+        self.investment_tab = QWidget()
+        (self.invest_add_btn, self.invest_verify_btn, self.invest_export_btn,
+         self.invest_import_btn, self.invest_clear_btn, self.investment_table,
+         self.total_invested_label, self.total_won_label, self.net_profit_label,
+         self.roi_label, self.win_rate_label, self.total_records_label,
+         self.invest_time_edit, self.invest_lottery_combo, self.invest_period_spin,
+         self.invest_amount_spin, self.invest_count_spin, self.invest_extra_check,
+         self.invest_numbers_edit, self.link_prediction_btn, self.prediction_info_label,
+         self.save_investment_btn, self.reset_investment_form_btn
+        ) = create_investment_plan_tab(self.investment_tab)
+        # 连接投注计划标签页的信号和槽
+        self.invest_add_btn.clicked.connect(self.add_investment_record)
+        self.invest_verify_btn.clicked.connect(self.verify_investment_records)
+        self.invest_export_btn.clicked.connect(self.export_investment_records)
+        self.invest_import_btn.clicked.connect(self.import_investment_records)
+        self.invest_clear_btn.clicked.connect(self.clear_investment_records)
+        self.link_prediction_btn.clicked.connect(self.link_to_prediction)
+        self.save_investment_btn.clicked.connect(self.save_investment_records)
+        self.reset_investment_form_btn.clicked.connect(self.reset_investment_form)
+        self.tab_widget.addTab(self.investment_tab, "投注计划")
+        
         # 统一 tab 标签字体到 11pt，并加 padding/高度防截断
         from PyQt5.QtGui import QFont
         tab_font = QFont()
@@ -264,6 +290,7 @@ class LotteryPredictorApp(QMainWindow):
             (self.backtest_tab, 'backtest', '历史回测', None),
             (self.ziwei_tab, 'ziwei', '紫微斗数', None),
             (self.meihua_tab, 'meihua', '梅花易数', None),
+            (self.investment_tab, 'investment', '投注计划', None),
         ]
         for widget, key, label, rl_attr in tabs:
             layout = widget.layout()
@@ -903,6 +930,556 @@ class LotteryPredictorApp(QMainWindow):
         scrollbar = self.log_box.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
         
+    # ===== 投注计划管理功能 =====
+    def add_investment_record(self):
+        """添加投注记录"""
+        try:
+            # 获取表单数据
+            invest_time = self.invest_time_edit.dateTime().toString("yyyy-MM-dd HH:mm")
+            lottery_key = self.invest_lottery_combo.currentData()
+            lottery_name = self.invest_lottery_combo.currentText()
+            period = self.invest_period_spin.value()
+            amount = self.invest_amount_spin.value()
+            count = self.invest_count_spin.value()
+            is_extra = self.invest_extra_check.isChecked()
+            numbers_text = self.invest_numbers_edit.text().strip()
+            
+            # 基础验证
+            if not numbers_text:
+                QMessageBox.warning(self, "输入错误", "请输入选号")
+                return
+                
+            if amount <= 0:
+                QMessageBox.warning(self, "输入错误", "投入金额必须大于0")
+                return
+                
+            if count <= 0:
+                QMessageBox.warning(self, "输入错误", "投入注数必须大于0")
+                return
+            
+            # 查找对应预测
+            prediction_info = ""
+            try:
+                from prediction_records import load_records
+                records = load_records()
+                # 查找匹配的预测记录（同彩票类型、期号）
+                for rec in reversed(records):  # 从最新的开始找
+                    if rec.get('lottery_type') == lottery_key and str(rec.get('latest_period', '')) == str(period):
+                        prediction_info = f"{rec.get('model_type', '未知')}: {rec.get('red_numbers', [])} + {rec.get('blue_numbers', [])}"
+                        break
+            except Exception:
+                pass  # 查找预测失败不影响记录添加
+            
+            # 创建记录
+            record = {
+                'datetime': invest_time,
+                'lottery_type': lottery_key,
+                'lottery_name': lottery_name,
+                'period': period,
+                'invest_amount': amount,
+                'invest_count': count,
+                'is_extra': is_extra,
+                'numbers_text': numbers_text,
+                'prediction_info': prediction_info,
+                'status': '待开奖',  # 待开奖、已核验
+                'actual_numbers': None,
+                'prize_name': None,
+                'prize_amount': 0.0,
+                'profit_loss': 0.0,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # 添加到表格
+            row_pos = self.investment_table.rowCount()
+            self.investment_table.insertRow(row_pos)
+            
+            # 填充表格数据
+            self.investment_table.setItem(row_pos, 0, QTableWidgetItem(invest_time))
+            self.investment_table.setItem(row_pos, 1, QTableWidgetItem(lottery_name))
+            self.investment_table.setItem(row_pos, 2, QTableWidgetItem(str(period)))
+            self.investment_table.setItem(row_pos, 3, QTableWidgetItem(f"{amount:.2f}"))
+            self.investment_table.setItem(row_pos, 4, QTableWidgetItem(str(count)))
+            self.investment_table.setItem(row_pos, 5, QTableWidgetItem(numbers_text))
+            self.investment_table.setItem(row_pos, 6, QTableWidgetItem(prediction_info if prediction_info else "无"))
+            self.investment_table.setItem(row_pos, 7, QTableWidgetItem("待开奖"))
+            self.investment_table.setItem(row_pos, 8, QTableWidgetItem("待开奖"))
+            self.investment_table.setItem(row_pos, 9, QTableWidgetItem("0.00"))
+            
+            # 添加到内存列表
+            self.investment_records.append(record)
+            
+            # 更新统计
+            self.update_investment_stats()
+            
+            self.log_emitter.new_log.emit(f"投注记录已添加: {lottery_name} 第{period}期 投入{amount:.2f}元({count}注)")
+            
+            # 如果不是追加模式，重置表单
+            if not is_extra:
+                self.reset_investment_form()
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"添加投注记录时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"添加投注记录失败:\n{str(e)}")
+    
+    def verify_investment_records(self):
+        """核验选中的投注记录"""
+        try:
+            selected_rows = sorted(set(item.row() for item in self.investment_table.selectedItems()))
+            if not selected_rows:
+                QMessageBox.information(self, "提示", "请先选择要核验的投注记录")
+                return
+            
+            # 加载开奖数据
+            verified_count = 0
+            for row in selected_rows:
+                # 检查是否已经核验过
+                status_item = self.investment_table.item(row, 8)
+                if status_item and status_item.text() != "待开奖":
+                    continue  # 已经核验过，跳过
+                
+                # 获取记录信息
+                lottery_type = self.investment_table.item(row, 1).text()
+                period_text = self.investment_table.item(row, 2).text()
+                numbers_text = self.investment_table.item(row, 5).text()
+                
+                try:
+                    period = int(period_text)
+                except ValueError:
+                    continue
+                
+                # 查找开奖数据
+                actual_red = []
+                actual_blue = []
+                prize_name = "未中奖"
+                prize_amount = 0.0
+                
+                try:
+                    from scripts.data_analysis import load_lottery_data
+                    lt_key = 'ssq' if lottery_type == '双色球' else 'dlt'
+                    df = load_lottery_data(lt_key)
+                    if df is not None and not df.empty:
+                        df = df.sort_values('期数', ascending=False)
+                        match_row = df[df['期数'] == period]
+                        if not match_row.empty:
+                            # 获取实际开奖号码
+                            if lottery_type == '双色球':
+                                red_cols = [c for c in df.columns if c.startswith('红球_')]
+                                blue_cols = [c for c in df.columns if c.startswith('蓝球_') or c == '蓝球']
+                                if red_cols and blue_cols:
+                                    actual_red = [int(match_row.iloc[0][c]) for c in sorted(red_cols)[:6]]
+                                    blue_cols_sorted = sorted([c for c in blue_cols if c == '蓝球' or c.startswith('蓝球_')])
+                                    actual_blue = [int(match_row.iloc[0][c]) for c in blue_cols_sorted]
+                            else:  # 大乐透
+                                red_cols = [c for c in df.columns if c.startswith('红球_')]
+                                blue_cols = [c for c in df.columns if c.startswith('蓝球_')]
+                                if red_cols and blue_cols:
+                                    actual_red = [int(match_row.iloc[0][c]) for c in sorted(red_cols)[:5]]
+                                    actual_blue = [int(match_row.iloc[0][c]) for c in sorted(blue_cols)[:2]]
+                            
+                            # 计算中奖情况
+                            if actual_red and actual_blue and numbers_text:
+                                # 解析投注号码
+                                try:
+                                    parts = numbers_text.replace(' ', '+').split('+')
+                                    if len(parts) == 2:
+                                        red_str, blue_str = parts
+                                        bet_red = [int(x.strip()) for x in red_str.split()]
+                                        bet_blue = [int(x.strip()) for x in blue_str.split()]
+                                        
+                                        red_hits = len(set(bet_red) & set(actual_red))
+                                        blue_hits = len(set(bet_blue) & set(actual_blue))
+                                        
+                                        # 查询奖级
+                                        from backtest import _lookup_prize
+                                        prize_name, prize_amount = _lookup_prize(lt_key, red_hits, blue_hits)
+                                        
+                                        actual_red_str = ' '.join(f'{n:02d}' for n in actual_red)
+                                        actual_blue_str = ' '.join(f'{n:02d}' for n in actual_blue)
+                                    else:
+                                        # 格式不正确，尝试其他方式
+                                        nums = [int(x) for x in numbers_text.replace('+', ' ').split()]
+                                        if lottery_type == '双色球' and len(nums) >= 7:
+                                            bet_red = nums[:6]
+                                            bet_blue = nums[6:7]
+                                        elif lottery_type == '大乐透' and len(nums) >= 7:
+                                            bet_red = nums[:5]
+                                            bet_blue = nums[5:7]
+                                        else:
+                                            bet_red, bet_blue = [], []
+                                        
+                                        red_hits = len(set(bet_red) & set(actual_red))
+                                        blue_hits = len(set(bet_blue) & set(actual_blue))
+                                        
+                                        from backtest import _lookup_prize
+                                        prize_name, prize_amount = _lookup_prize(lt_key, red_hits, blue_hits)
+                                        
+                                        actual_red_str = ' '.join(f'{n:02d}' for n in actual_red)
+                                        actual_blue_str = ' '.join(f'{n:02d}' for n in actual_blue)
+                                except Exception:
+                                    actual_red_str = ' '.join(f'{n:02d}' for n in actual_red)
+                                    actual_blue_str = ' '.join(f'{n:02d}' for n in actual_blue)
+                                    prize_name = "号码解析失败"
+                                    prize_amount = 0.0
+                            else:
+                                actual_red_str = ' '.join(f'{n:02d}' for n in actual_red) if actual_red else "无数据"
+                                actual_blue_str = ' '.join(f'{n:02d}' for n in actual_blue) if actual_blue else "无数据"
+                        else:
+                            actual_red_str = "期号不存在"
+                            actual_blue_str = ""
+                    else:
+                        actual_red_str = "数据加载失败"
+                        actual_blue_str = ""
+                except Exception as e:
+                    actual_red_str = f"查询出错: {str(e)}"
+                    actual_blue_str = ""
+                    prize_name = "查询失败"
+                    prize_amount = 0.0
+                
+                # 更新表格
+                self.investment_table.setItem(row, 7, QTableWidgetItem(f"{actual_red_str} + {actual_blue_str}"))
+                self.investment_table.setItem(row, 8, QTableWidgetItem(prize_name))
+                
+                # 计算盈亏
+                try:
+                    invest_amount = float(self.investment_table.item(row, 3).text())
+                    profit_loss = prize_amount - invest_amount
+                    self.investment_table.setItem(row, 9, QTableWidgetItem(f"{profit_loss:.2f}"))
+                    
+                    # 更新记录中的盈亏
+                    if row < len(self.investment_records):
+                        self.investment_records[row]['actual_numbers'] = f"{actual_red_str} + {actual_blue_str}"
+                        self.investment_records[row]['prize_name'] = prize_name
+                        self.investment_records[row]['prize_amount'] = prize_amount
+                        self.investment_records[row]['profit_loss'] = profit_loss
+                        self.investment_records[row]['status'] = '已核验'
+                except Exception:
+                    self.investment_table.setItem(row, 9, QTableWidgetItem("0.00"))
+                
+                verified_count += 1
+            
+            if verified_count > 0:
+                # 保存记录
+                self.save_investment_records()
+                # 更新统计
+                self.update_investment_stats()
+                self.log_emitter.new_log.emit(f"已核验 {verified_count} 条投注记录")
+                QMessageBox.information(self, "核验完成", f"成功核验了 {verified_count} 条投注记录")
+            else:
+                self.log_emitter.new_log.emit("没有待核验的投注记录")
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"核验投注记录时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"核验投注记录失败:\n{str(e)}")
+    
+    def export_investment_records(self):
+        """导出投注记录"""
+        try:
+            if self.investment_table.rowCount() == 0:
+                QMessageBox.information(self, "提示", "暂无投注记录可导出")
+                return
+            
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "导出投注记录", 
+                f"投注记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                "CSV Files (*.csv)"
+            )
+            
+            if not file_path:
+                return
+            
+            import csv
+            with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                # 写入表头
+                headers = []
+                for col in range(self.investment_table.columnCount()):
+                    headers.append(self.investment_table.horizontalHeaderItem(col).text())
+                writer.writerow(headers)
+                
+                # 写入数据
+                for row in range(self.investment_table.rowCount()):
+                    row_data = []
+                    for col in range(self.investment_table.columnCount()):
+                        item = self.investment_table.item(row, col)
+                        row_data.append(item.text() if item else "")
+                    writer.writerow(row_data)
+            
+            self.log_emitter.new_log.emit(f"投注记录已导出到: {file_path}")
+            QMessageBox.information(self, "导出成功", f"投注记录已导出到:\n{file_path}")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"导出投注记录时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"导出投注记录失败:\n{str(e)}")
+    
+    def import_investment_records(self):
+        """导入投注记录"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "导入投注记录", "",
+                "CSV Files (*.csv)"
+            )
+            
+            if not file_path:
+                return
+            
+            import csv
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+            
+            if len(rows) < 2:
+                QMessageBox.warning(self, "导入失败", "CSV文件格式不正确或为空")
+                return
+            
+            # 清空现有记录
+            self.investment_table.setRowCount(0)
+            self.investment_records.clear()
+            
+            # 导入数据（跳过表头）
+            for row_idx, row in enumerate(rows[1:], start=0):
+                if len(row) >= 10:  # 至少需要10列
+                    self.investment_table.insertRow(row_idx)
+                    
+                    for col_idx, cell_data in enumerate(row[:10]):  # 只取前10列
+                        item = QTableWidgetItem(cell_data)
+                        self.investment_table.setItem(row_idx, col_idx, item)
+                    
+                    # 添加到内存列表（简化版）
+                    try:
+                        lottery_type = row[1] if len(row) > 1 else ''
+                        period = int(row[2]) if len(row) > 2 and row[2].isdigit() else 0
+                        amount = float(row[3]) if len(row) > 3 and row[3].replace('.', '', 1).isdigit() else 0.0
+                        count = int(row[4]) if len(row) > 4 and row[4].isdigit() else 0
+                        numbers_text = row[5] if len(row) > 5 else ''
+                        prediction_info = row[6] if len(row) > 6 else ''
+                        actual_numbers = row[7] if len(row) > 7 else ''
+                        prize_name = row[8] if len(row) > 8 else ''
+                        profit_loss = float(row[9]) if len(row) > 9 and row[9].replace('-', '', 1).replace('.', '', 1).isdigit() else 0.0
+                        
+                        record = {
+                            'datetime': row[0] if len(row) > 0 else '',
+                            'lottery_type': lottery_type,
+                            'lottery_name': lottery_type,  # 简化处理
+                            'period': period,
+                            'invest_amount': amount,
+                            'invest_count': count,
+                            'is_extra': False,
+                            'numbers_text': numbers_text,
+                            'prediction_info': prediction_info,
+                            'status': '已核验' if actual_numbers and actual_numbers != '待开奖' else '待开奖',
+                            'actual_numbers': actual_numbers,
+                            'prize_name': prize_name,
+                            'prize_amount': 0.0,  # 需要重新计算，这里先设0
+                            'profit_loss': profit_loss,
+                            'created_at': datetime.now().isoformat()
+                        }
+                        self.investment_records.append(record)
+                    except Exception:
+                        pass  # 单条记录导入失败不影响整体
+            
+            # 更新统计
+            self.update_investment_stats()
+            
+            self.log_emitter.new_log.emit(f"已导入 {len(rows)-1} 条投注记录")
+            QMessageBox.information(self, "导入成功", f"成功导入了 {len(rows)-1} 条投注记录")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"导入投注记录时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"导入投注记录失败:\n{str(e)}")
+    
+    def clear_investment_records(self):
+        """清空投注记录"""
+        try:
+            reply = QMessageBox.question(
+                self, "确认清空", 
+                "确定要清空所有投注记录吗？此操作不可撤销。",
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                self.investment_table.setRowCount(0)
+                self.investment_records.clear()
+                self.update_investment_stats()
+                self.log_emitter.new_log.emit("投注记录已清空")
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"清空投注记录时出错: {str(e)}")
+    
+    def save_investment_records(self):
+        """保存投注记录到文件"""
+        try:
+            import json
+            records_to_save = []
+            for record in self.investment_records:
+                # 创建可序列化的副本
+                save_record = record.copy()
+                records_to_save.append(save_record)
+            
+            with open(self.investment_file, 'w', encoding='utf-8') as f:
+                json.dump(records_to_save, f, ensure_ascii=False, indent=2)
+            
+            self.log_emitter.new_log.emit(f"投注记录已保存到: {self.investment_file}")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"保存投注记录时出错: {str(e)}")
+    
+    def load_investment_records(self):
+        """从文件加载投注记录"""
+        try:
+            import json
+            import os
+            if not os.path.exists(self.investment_file):
+                return
+            
+            with open(self.investment_file, 'r', encoding='utf-8') as f:
+                records = json.load(f)
+            
+            self.investment_records = records
+            
+            # 重建表格
+            self.investment_table.setRowCount(0)
+            for row_idx, record in enumerate(records):
+                self.investment_table.insertRow(row_idx)
+                
+                # 填充表格数据
+                invest_time = record.get('datetime', '')
+                lottery_name = record.get('lottery_name', '')
+                period = record.get('period', 0)
+                amount = record.get('invest_amount', 0.0)
+                count = record.get('invest_count', 0)
+                numbers_text = record.get('numbers_text', '')
+                prediction_info = record.get('prediction_info', '')
+                actual_numbers = record.get('actual_numbers', '待开奖')
+                prize_name = record.get('prize_name', '待开奖')
+                profit_loss = record.get('profit_loss', 0.0)
+                
+                self.investment_table.setItem(row_idx, 0, QTableWidgetItem(invest_time))
+                self.investment_table.setItem(row_idx, 1, QTableWidgetItem(lottery_name))
+                self.investment_table.setItem(row_idx, 2, QTableWidgetItem(str(period)))
+                self.investment_table.setItem(row_idx, 3, QTableWidgetItem(f"{amount:.2f}"))
+                self.investment_table.setItem(row_idx, 4, QTableWidgetItem(str(count)))
+                self.investment_table.setItem(row_idx, 5, QTableWidgetItem(numbers_text))
+                self.investment_table.setItem(row_idx, 6, QTableWidgetItem(prediction_info if prediction_info else "无"))
+                self.investment_table.setItem(row_idx, 7, QTableWidgetItem(actual_numbers))
+                self.investment_table.setItem(row_idx, 8, QTableWidgetItem(prize_name))
+                self.investment_table.setItem(row_idx, 9, QTableWidgetItem(f"{profit_loss:.2f}"))
+            
+            # 更新统计
+            self.update_investment_stats()
+            
+            self.log_emitter.new_log.emit(f"已加载 {len(records)} 条投注记录")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"加载投注记录时出错: {str(e)}")
+    
+    def update_investment_stats(self):
+        """更新投注统计信息"""
+        try:
+            total_invested = 0.0
+            total_won = 0.0
+            win_count = 0
+            total_records = len(self.investment_records)
+            
+            for record in self.investment_records:
+                invest_amount = record.get('invest_amount', 0.0)
+                prize_amount = record.get('prize_amount', 0.0)
+                
+                total_invested += invest_amount
+                total_won += prize_amount
+                
+                if record.get('prize_name') and record.get('prize_name') not in ('未中奖', '号码解析失败', '查询失败', '数据加载失败', '期号不存在'):
+                    win_count += 1
+            
+            net_profit = total_won - total_invested
+            roi = (net_profit / total_invested * 100) if total_invested > 0 else 0.0
+            win_rate = (win_count / total_records * 100) if total_records > 0 else 0.0
+            
+            # 更新标签
+            self.total_invested_label.setText(f"{total_invested:.2f} 元")
+            self.total_won_label.setText(f"{total_won:.2f} 元")
+            self.net_profit_label.setText(f"{net_profit:.2f} 元")
+            self.roi_label.setText(f"{roi:.2f}%")
+            self.win_rate_label.setText(f"{win_rate:.2f}%")
+            self.total_records_label.setText(f"{total_records} 条")
+            
+            # 根据盈亏设置颜色
+            if net_profit > 0:
+                self.net_profit_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #4CAF50;")
+                self.roi_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #4CAF50;")
+            elif net_profit < 0:
+                self.net_profit_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #F44336;")
+                self.roi_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #F44336;")
+            else:
+                self.net_profit_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+                self.roi_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"更新投注统计时出错: {str(e)}")
+    
+    def link_to_prediction(self):
+        """链接到对应的预测"""
+        try:
+            lottery_type = self.invest_lottery_combo.currentText()
+            period = self.invest_period_spin.value()
+            
+            if not lottery_type or period <= 0:
+                QMessageBox.information(self, "提示", "请先选择彩票类型和期号")
+                return
+            
+            # 查找最近的预测存档
+            from prediction_records import load_records
+            records = load_records()
+            
+            lt_key = 'ssq' if lottery_type == '双色球' else 'dlt'
+            best_match = None
+            best_time = None
+            
+            for rec in records:
+                if rec.get('lottery_type') == lt_key:
+                    try:
+                        rec_period = int(rec.get('latest_period', 0))
+                        if rec_period <= period:  # 只看不超过目标期的预测
+                            rec_time = datetime.fromisoformat(rec.get('predict_time', '1970-01-01'))
+                            if best_time is None or rec_time > best_time:
+                                best_time = rec_time
+                                best_match = rec
+                    except Exception:
+                        pass
+            
+            if best_match:
+                pred_text = f"{best_match.get('model_type', '未知')}模型预测:\n"
+                pred_text += f"红球: {' '.join(f'{n:02d}' for n in best_match.get('red_numbers', []))}\n"
+                pred_text += f"蓝球: {' '.join(f'{n:02d}' for n in best_match.get('blue_numbers', []))}\n"
+                pred_text += f"预测时间: {best_match.get('predict_time', '')}\n"
+                pred_text += f"基于期数: {best_match.get('latest_period', '')}"
+                
+                self.prediction_info_label.setText(pred_text)
+                self.prediction_info_label.setStyleSheet("font-size: 10pt; color: #2196F3; font-style: normal;")
+            else:
+                self.prediction_info_label.setText("未找到对应的预测记录\n（可能是该期尚未有预测存档）")
+                self.prediction_info_label.setStyleSheet("font-size: 10pt; color: #999; font-style: italic;")
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"链接预测时出错: {str(e)}")
+            self.prediction_info_label.setText("查询预测时出错")
+            self.prediction_info_label.setStyleSheet("font-size: 10pt; color: #F44336; font-style: normal;")
+    
+    def reset_investment_form(self):
+        """重置投注表单"""
+        try:
+            self.invest_time_edit.setDateTime(QDateTime.currentDateTime())
+            self.invest_lottery_combo.setCurrentIndex(0)
+            self.invest_period_spin.setValue(1)
+            self.invest_amount_spin.setValue(2.0)
+            self.invest_count_spin.setValue(1)
+            self.invest_extra_check.setChecked(False)
+            self.invest_numbers_edit.clear()
+            self.prediction_info_label.setText("暂无关联预测")
+            self.prediction_info_label.setStyleSheet("font-size: 10pt; color: #666; font-style: italic;")
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"重置投注表单时出错: {str(e)}")
+    
     def analyze_data(self):
         selected_index = self.lottery_combo.currentIndex()
         selected_key = list(name_path.keys())[selected_index]
