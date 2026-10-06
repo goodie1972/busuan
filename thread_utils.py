@@ -460,3 +460,97 @@ class AutoPredictThread(QThread):
     def terminate(self):
         self.should_terminate = True
         super().terminate()
+
+
+class DataCheckThread(QThread):
+    """轻量检查官方是否有新开奖数据（只取1条，不下载全量）"""
+    new_data_signal = pyqtSignal(bool, str)  # (是否有新数据, 提醒文本)
+
+    def __init__(self, lottery_type='dlt'):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.should_terminate = False
+
+    def run(self):
+        try:
+            import requests
+            import pandas as pd
+
+            # 1. 读取本地最新期数
+            local_file = os.path.join('scripts', self.lottery_type,
+                                      f'{self.lottery_type}_history.csv')
+            if not os.path.exists(local_file):
+                self.new_data_signal.emit(False, "")
+                return
+
+            local_latest = 0
+            for enc in ['utf-8', 'gbk', 'utf-8-sig']:
+                try:
+                    df = pd.read_csv(local_file, encoding=enc)
+                    local_latest = int(df['期数'].max())
+                    break
+                except Exception:
+                    continue
+
+            # 2. 轻量获取官方最新期数（只取1条）
+            if self.lottery_type == 'ssq':
+                remote_latest = self._check_ssq()
+            else:
+                remote_latest = self._check_dlt()
+
+            if remote_latest is None:
+                self.new_data_signal.emit(False, "")
+                return
+
+            # 3. 比较
+            if remote_latest > local_latest:
+                lottery_name = name_path[self.lottery_type]['name']
+                msg = f"{lottery_name}有新开奖（第{remote_latest}期），建议更新数据"
+                self.new_data_signal.emit(True, msg)
+            else:
+                self.new_data_signal.emit(False, "")
+
+        except Exception:
+            self.new_data_signal.emit(False, "")
+
+    def _check_ssq(self):
+        """轻量获取双色球最新期数（只取1条）"""
+        import requests
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json",
+            "Referer": "https://www.cwl.gov.cn/",
+        }
+        s = requests.Session()
+        s.headers.update(headers)
+        s.get("https://www.cwl.gov.cn/", timeout=10)
+        url = "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice"
+        params = {"name": "ssq", "pageNo": "1", "pageSize": "1", "systemType": "PC"}
+        resp = s.get(url, params=params, timeout=15)
+        data = resp.json()
+        items = data.get("result", [])
+        if items:
+            code = items[0].get("code", "")
+            if code:
+                sc = str(code).strip()
+                if len(sc) >= 7 and sc.isdigit():
+                    return int(sc[1:])
+                return int(sc)
+        return None
+
+    def _check_dlt(self):
+        """轻量获取大乐透最新期数（只取1条）"""
+        import requests
+        url = "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry"
+        params = {"gameNo": "85", "provinceId": "0", "pageSize": "1",
+                   "isVerify": "1", "pageNo": "1"}
+        headers = {"User-Agent": "Mozilla/5.0",
+                    "Referer": "https://static.sporttery.cn/"}
+        resp = requests.get(url, params=params, headers=headers, timeout=15)
+        data = resp.json()
+        items = data.get("value", {}).get("list", [])
+        if items:
+            draw_num = items[0].get("lotteryDrawNum", "")
+            if draw_num:
+                return int(draw_num)
+        return None

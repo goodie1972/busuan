@@ -236,8 +236,18 @@ class LotteryPredictorApp(QMainWindow):
 
         self.setCentralWidget(self.tab_widget)
         
+        # 数据更新定时提醒相关
+        self.data_check_timer = QTimer()
+        self.data_check_thread = None
+        self.last_data_check_time = 0
+        
         self.training_thread = None
         self.is_training_paused = False
+
+        # 启动数据更新定时提醒（每30分钟检查一次，首次启动后10秒开始）
+        self.data_check_timer.timeout.connect(self.start_data_check)
+        self.data_check_timer.start(30 * 60 * 1000)  # 30分钟
+        QTimer.singleShot(10000, self.start_data_check)  # 首次延迟10秒
 
     def _add_copy_print_buttons(self):
         """为每个有结果的标签页添加「复制结果」+「打印结果」按钮
@@ -1023,6 +1033,35 @@ class LotteryPredictorApp(QMainWindow):
         self.update_data_button.setEnabled(True)
         self.lottery_combo.setEnabled(True)
         self.update_log("数据更新线程已结束。")
+
+    def start_data_check(self):
+        """启动数据更新检查线程（防重复启动）"""
+        if self.data_check_thread and self.data_check_thread.isRunning():
+            return
+        # 每次检查前更新last时间（简单防抖）
+        import time
+        now = time.time()
+        if now - self.last_data_check_time < 30:  # 30秒内不重复检查
+            return
+        self.last_data_check_time = now
+
+        current_lottery = list(name_path.keys())[self.lottery_combo.currentIndex()]
+        self.data_check_thread = DataCheckThread(lottery_type=current_lottery)
+        self.data_check_thread.new_data_signal.connect(self.on_data_check_result)
+        self.data_check_thread.start()
+
+    def on_data_check_result(self, has_new: bool, message: str):
+        """处理数据检查结果"""
+        if has_new and message:
+            # 状态栏提醒（3秒）
+            self.statusBar().showMessage(message, 3000)
+            # 标题栏追加提醒（不覆盖GPU信息）
+            base_title = f"卜算 - 彩票娱乐软件 - GPU: {self.cuda_info}"
+            self.setWindowTitle(base_title + " ｜ " + message)
+        else:
+            # 无新数据时恢复原标题
+            base_title = f"卜算 - 彩票娱乐软件 - GPU: {self.cuda_info}"
+            self.setWindowTitle(base_title)
 
     def start_auto_predict(self):
         """一键智能预测按钮点击处理"""
