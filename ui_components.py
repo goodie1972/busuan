@@ -218,8 +218,14 @@ def create_main_tab(main_tab):
     row3.addWidget(theme_label)
     row3.addWidget(theme_combo)
     row3.addWidget(customize_theme_button)
-    row3.addSpacing(20)
     row3.addWidget(gpu_checkbox)
+    # 自动重训策略复选框
+    autoretrain_checkbox = QCheckBox("自动重训")
+    autoretrain_checkbox.setStyleSheet(label_style)
+    autoretrain_checkbox.setChecked(False)  # 默认关闭
+    autoretrain_checkbox.setToolTip("启用后，当回测表现下降时自动触发模型重训")
+    row3.addWidget(autoretrain_checkbox)
+    row3.addSpacing(20)
     row3.addStretch()
     main_layout.addLayout(row3)
 
