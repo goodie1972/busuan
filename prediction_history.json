@@ -5894,5 +5894,137 @@
     "blue_hits": null,
     "prize_name": null,
     "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      3,
+      4,
+      6,
+      10,
+      18
+    ],
+    "blue_numbers": [
+      6,
+      8
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      3,
+      4,
+      6,
+      10,
+      26
+    ],
+    "blue_numbers": [
+      10,
+      12
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      4,
+      5,
+      6,
+      10,
+      14
+    ],
+    "blue_numbers": [
+      2,
+      7
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      3,
+      4,
+      6,
+      10,
+      24
+    ],
+    "blue_numbers": [
+      10,
+      11
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      3,
+      6,
+      10,
+      17,
+      27
+    ],
+    "blue_numbers": [
+      10,
+      12
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
+  },
+  {
+    "predict_time": "2026-10-01T11:04:13",
+    "lottery_type": "dlt",
+    "model_type": "ensemble",
+    "latest_period": 26112,
+    "red_numbers": [
+      3,
+      4,
+      5,
+      6,
+      10
+    ],
+    "blue_numbers": [
+      10,
+      12
+    ],
+    "target_period": null,
+    "red_hits": null,
+    "blue_hits": null,
+    "prize_name": null,
+    "prize_amount": null
   }
 ]
