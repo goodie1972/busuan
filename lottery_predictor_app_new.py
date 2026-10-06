@@ -30,7 +30,7 @@ from ml_models import (
 )
 from thread_utils import (
     TrainModelThread, UpdateDataThread, LogEmitter, BacktestThread,
-    AutoPredictThread
+    AutoPredictThread, DataCheckThread
 )
 from prediction_utils import (
     process_predictions, randomize_numbers
