@@ -59,6 +59,8 @@ def create_main_tab(main_tab):
     model_combo.addItem("LSTM-CRF (默认)")
     from ml_models import MODEL_TYPES
     for model_key, model_name in MODEL_TYPES.items():
+        if model_key in ('ziwei', 'meihua'):
+            continue  # 紫微斗数/梅花易数有独立标签页，不放入预测模型下拉框
         model_combo.addItem(model_name)
     row1.addWidget(lottery_label)
     row1.addWidget(lottery_combo, 1)

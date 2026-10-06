@@ -234,18 +234,20 @@ class LotteryPredictorApp(QMainWindow):
         self.is_training_paused = False
 
     def _add_copy_print_buttons(self):
-        """为每个有结果的标签页添加「复制结果」+「打印结果」按钮"""
-        # (tab_widget, result_extractor_name, tab_label)
+        """为每个有结果的标签页添加「复制结果」+「打印结果」按钮
+        预测页/期望值页：按钮放在结果框内部；其他页：放在底部
+        """
+        # (tab_widget, result_extractor_name, tab_label, result_label_attr)
         tabs = [
-            (self.main_tab, 'main', '预测'),
-            (self.expectedvalue_tab, 'ev', '期望值模型'),
-            (self.analysis_tab, 'analysis', '数据分析'),
-            (self.advanced_stats_tab, 'advanced', '高级统计'),
-            (self.backtest_tab, 'backtest', '历史回测'),
-            (self.ziwei_tab, 'ziwei', '紫微斗数'),
-            (self.meihua_tab, 'meihua', '梅花易数'),
+            (self.main_tab, 'main', '预测', 'result_label'),
+            (self.expectedvalue_tab, 'ev', '期望值模型', 'ev_result_label'),
+            (self.analysis_tab, 'analysis', '数据分析', None),
+            (self.advanced_stats_tab, 'advanced', '高级统计', None),
+            (self.backtest_tab, 'backtest', '历史回测', None),
+            (self.ziwei_tab, 'ziwei', '紫微斗数', None),
+            (self.meihua_tab, 'meihua', '梅花易数', None),
         ]
-        for widget, key, label in tabs:
+        for widget, key, label, rl_attr in tabs:
             layout = widget.layout()
             if layout is None:
                 continue
@@ -255,12 +257,22 @@ class LotteryPredictorApp(QMainWindow):
             copy_btn.setStyleSheet("font-size: 11pt; padding: 6px 16px;")
             print_btn = QPushButton(f"🖨 打印{label}结果")
             print_btn.setStyleSheet("font-size: 11pt; padding: 6px 16px;")
-            # 用 lambda 捕获 key
             copy_btn.clicked.connect(lambda _, k=key: self._copy_result(k))
             print_btn.clicked.connect(lambda _, k=key: self._print_result(k))
             btn_layout.addWidget(copy_btn)
             btn_layout.addWidget(print_btn)
-            layout.addLayout(btn_layout)
+
+            # 预测页/期望值页：按钮放到结果框内部
+            if rl_attr and hasattr(self, rl_attr):
+                rl = getattr(self, rl_attr)
+                parent_layout = rl.parent().layout()  # result_group 的 layout
+                if parent_layout:
+                    parent_layout.addLayout(btn_layout)
+                else:
+                    layout.addLayout(btn_layout)
+            else:
+                # 其他页：放到底部
+                layout.addLayout(btn_layout)
 
     def _get_tab_result_text(self, tab_key):
         """提取指定标签页的结果文本"""
