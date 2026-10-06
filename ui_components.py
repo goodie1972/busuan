@@ -1452,3 +1452,188 @@ def create_number_filter_tab(filter_tab):
         self.apply_filter_btn, self.reset_filter_btn,
         self.filter_before_label, self.filter_after_label, self.filter_stats_label
     )
+
+def create_number_filter_tab(filter_tab):
+    """
+    创建号码过滤规则标签页
+
+    功能：
+    1. 定义红蓝球的过滤条件（奇偶、大小、和尾、连号、质数等）
+    2. 对预测生成的号码应用过滤规则
+    3. 显示过滤前后的号码对比
+    4. 支持保存/加载过滤规则配置
+    """
+    from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
+                                  QLabel, QComboBox, QSpinBox, QCheckBox,
+                                  QPushButton, QTableWidget, QTableWidgetItem,
+                                  QHeaderView, QAbstractItemView, QMessageBox,
+                                  QFileDialog, QLineEdit, QTextEdit)
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QFont, QColor
+    import json
+    import os
+    from datetime import datetime
+
+    # 主布局
+    main_layout = QVBoxLayout(filter_tab)
+    main_layout.setSpacing(10)
+    main_layout.setContentsMargins(12, 12, 12, 12)
+
+    # 标题
+    title_label = QLabel("号码过滤规则")
+    title_label.setAlignment(Qt.AlignCenter)
+    title_label.setStyleSheet("font-size: 16pt; font-weight: bold; margin-bottom: 10px;")
+    main_layout.addWidget(title_label)
+
+    # 过滤规则表格
+    table_group = QGroupBox("过滤规则列表")
+    table_layout = QVBoxLayout(table_group)
+
+    # 表格工具栏
+    toolbar_layout = QHBoxLayout()
+
+    add_filter_btn = QPushButton("添加规则")
+    add_filter_btn.setStyleSheet("font-size: 11pt; font-weight: bold; background-color: #4CAF50; color: white;")
+    add_filter_btn.setMinimumHeight(32)
+
+    delete_filter_btn = QPushButton("删除选中")
+    delete_filter_btn.setStyleSheet("font-size: 11pt; background-color: #F44336; color: white;")
+    delete_filter_btn.setMinimumHeight(32)
+
+    clear_filter_btn = QPushButton("清空规则")
+    clear_filter_btn.setStyleSheet("font-size: 11pt; background-color: #9C27B0; color: white;")
+    clear_filter_btn.setMinimumHeight(32)
+
+    save_filter_btn = QPushButton("保存规则")
+    save_filter_btn.setStyleSheet("font-size: 11pt; background-color: #FF9800; color: white;")
+    save_filter_btn.setMinimumHeight(32)
+
+    load_filter_btn = QPushButton("加载规则")
+    load_filter_btn.setStyleSheet("font-size: 11pt; background-color: #2196F3; color: white;")
+    load_filter_btn.setMinimumHeight(32)
+
+    toolbar_layout.addWidget(add_filter_btn)
+    toolbar_layout.addWidget(delete_filter_btn)
+    toolbar_layout.addWidget(clear_filter_btn)
+    toolbar_layout.addWidget(save_filter_btn)
+    toolbar_layout.addWidget(load_filter_btn)
+    toolbar_layout.addStretch()
+
+    table_layout.addLayout(toolbar_layout)
+
+    # 过滤规则表格
+    filter_table = QTableWidget()
+    filter_table.setColumnCount(5)
+    filter_table.setHorizontalHeaderLabels([
+        "启用", "规则类型", "参数", "描述", "操作"
+    ])
+
+    # 设置表格属性
+    filter_table.setAlternatingRowColors(True)
+    filter_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    filter_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    filter_table.horizontalHeader().setStretchLastSection(True)
+    filter_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+
+    # 设置列宽
+    header = filter_table.horizontalHeader()
+    header.resizeSection(0, 50)   # 启用复选框
+    header.resizeSection(1, 120)  # 规则类型
+    header.resizeSection(2, 100)  # 参数
+    header.resizeSection(3, 250)  # 描述
+    header.resizeSection(4, 80)   # 操作按钮
+
+    table_layout.addWidget(filter_table)
+    main_layout.addWidget(table_group)
+
+    # 过滤操作面板
+    action_group = QGroupBox("过滤操作")
+    action_layout = QFormLayout(action_group)
+
+    # 选择要过滤的号码来源
+    filter_source_combo = QComboBox()
+    filter_source_combo.addItems(["当前预测号码", "最新存档预测", "自定义号码"])
+    filter_source_combo.setCurrentText("当前预测号码")
+    action_layout.addRow("号码来源:", filter_source_combo)
+
+    # 自定义号码输入（当选择自定义号码时启用）
+    custom_numbers_edit = QLineEdit()
+    custom_numbers_edit.setPlaceholderText("格式: 红球 01 02 03 04 05 06 + 蓝球 07（双色球）或 红球 01 02 03 04 05 + 蓝球 06 07（大乐透）")
+    custom_numbers_edit.setStyleSheet("font-size: 11pt; padding: 5px;")
+    custom_numbers_edit.setEnabled(False)
+    action_layout.addRow("自定义号码:", custom_numbers_edit)
+
+    # 当选择变化时启用/禁用自定义号码输入
+    filter_source_combo.currentTextChanged.connect(
+        lambda text: custom_numbers_edit.setEnabled(text == "自定义号码")
+    )
+
+    # 过滤按钮
+    apply_filter_btn = QPushButton("应用过滤")
+    apply_filter_btn.setStyleSheet("font-size: 11pt; font-weight: bold; background-color: #4CAF50; color: white;")
+    apply_filter_btn.setMinimumHeight(35)
+    action_layout.addRow("", apply_filter_btn)
+
+    # 重置按钮
+    reset_filter_btn = QPushButton("重置过滤")
+    reset_filter_btn.setStyleSheet("font-size: 11pt; background-color: #607D8B; color: white;")
+    reset_filter_btn.setMinimumHeight(35)
+    action_layout.addRow("", reset_filter_btn)
+
+    main_layout.addWidget(action_group)
+
+    # 过滤结果显示
+    result_group = QGroupBox("过滤结果")
+    result_layout = QVBoxLayout(result_group)
+
+    # 过滤前号码显示
+    filter_before_label = QLabel("过滤前: 暂无号码")
+    filter_before_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #2196F3;")
+    filter_before_label.setWordWrap(True)
+    result_layout.addWidget(filter_before_label)
+
+    # 过滤后号码显示
+    filter_after_label = QLabel("过滤后: 暂无号码")
+    filter_after_label.setStyleSheet("font-size: 12pt; font-weight: bold; color: #4CAF50;")
+    filter_after_label.setWordWrap(True)
+    result_layout.addWidget(filter_after_label)
+
+    # 过滤统计
+    filter_stats_label = QLabel("过滤统计: 0 个号码通过过滤")
+    filter_stats_label.setStyleSheet("font-size: 11pt; color: #666;")
+    result_layout.addWidget(filter_stats_label)
+
+    main_layout.addWidget(result_group)
+
+    # 底部说明
+    info_label = QLabel(
+        "<p style='color:#888;font-size:9pt;'>"
+        "过滤规则说明："
+        "<br>• 奇偶：保留奇数或偶数号码"
+        "<br>• 大小：保留大于等于阈值的号码（红球：1-33，大数为17-33；蓝球：1-16，大数为9-16）"
+        "<br>• 和尾：保留号码个位等于指数字的号码"
+        "<br>• 连号：过滤掉包含连续号码的组合（如 01 02 03）"
+        "<br>• 质数：保留质数号码（红球质数：2,3,5,7,11,13,17,19,23,29,31；蓝球质数：2,3,5,7,11,13）"
+        "<br>• 合数：保留合数号码"
+        "<br>• 可组合多个规则，所有规则必须同时满足（AND 关系）"
+        "</p>"
+    )
+    info_label.setTextFormat(Qt.RichText)
+    info_label.setWordWrap(True)
+    main_layout.addWidget(info_label)
+
+    # 初始化数据
+    filter_rules = []  # 过滤规则列表，每个规则为 dict
+    filter_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                               'number_filter_rules.json')
+
+    # 返回关键控件的引用
+    return (
+        add_filter_btn, delete_filter_btn, clear_filter_btn,
+        save_filter_btn, load_filter_btn,
+        filter_table,
+        filter_source_combo, custom_numbers_edit,
+        apply_filter_btn, reset_filter_btn,
+        filter_before_label, filter_after_label, filter_stats_label
+    )
+
