@@ -301,7 +301,7 @@ def create_main_tab(main_tab):
             theme_combo, customize_theme_button, model_combo,
             mode_combo, compound_red_spin, compound_blue_spin,
             dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo,
-            auto_predict_button, compare_button)
+            auto_predict_button, compare_button, autoretrain_checkbox)
 
 
 def create_analysis_tab(analysis_tab):

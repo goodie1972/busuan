@@ -104,6 +104,11 @@ class LotteryPredictorApp(QMainWindow):
         self.investment_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
                                            'investment_history.json')
         
+        # 自动重训策略相关
+        self.autoretrain_enabled = False
+        self.backtest_history = []  # 保存历史回测结果
+        self.last_backtest_result = None
+        
         # 连接日志框的自定义右键菜单信号
         self.log_box.customContextMenuRequested.connect(self.show_log_context_menu)
         
@@ -135,7 +140,7 @@ class LotteryPredictorApp(QMainWindow):
         self.theme_combo, self.customize_theme_button, self.model_combo, \
         self.mode_combo, self.compound_red_spin, self.compound_blue_spin, \
         self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo, \
-        self.auto_predict_button, self.compare_button = create_main_tab(self.main_tab)
+        self.auto_predict_button, self.compare_button, self.autoretrain_checkbox = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -152,6 +157,8 @@ class LotteryPredictorApp(QMainWindow):
         self.auto_predict_button.clicked.connect(self.start_auto_predict)
         # 多模型对比按钮
         self.compare_button.clicked.connect(self.compare_models)
+        # 自动重训策略复选框
+        self.autoretrain_checkbox.stateChanged.connect(self.toggle_autoretrain)
         
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
@@ -948,7 +955,17 @@ class LotteryPredictorApp(QMainWindow):
             red_label.setText("红球: 待起卦")
             blue_label.setText("蓝球: 待起卦")
             detail_label.setText("卦象: 待起卦")
-
+    
+    def toggle_autoretrain(self, state):
+        """切换自动重训策略"""
+        self.autoretrain_enabled = (state == 2)  # Qt.Checked = 2
+        status = "启用" if self.autoretrain_enabled else "禁用"
+        self.log_emitter.new_log.emit(f"自动重训策略已{status}")
+        if self.autoretrain_enabled:
+            self.statusBar().showMessage("自动重训策略已启动，将监控回测表现", 3000)
+        else:
+            self.statusBar().showMessage("自动重训策略已停止", 3000)
+    
     def verify_prediction_records(self):
         """核验预测记录：统计实际生成过的预测的中奖情况"""
         try:
@@ -963,7 +980,17 @@ class LotteryPredictorApp(QMainWindow):
             self.bt_status_label.setText("核验失败")
         scrollbar = self.log_box.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        
+    
+    def toggle_autoretrain(self, state):
+        """切换自动重训策略"""
+        self.autoretrain_enabled = (state == 2)  # Qt.Checked = 2
+        status = "启用" if self.autoretrain_enabled else "禁用"
+        self.log_emitter.new_log.emit(f"自动重训策略已{status}")
+        if self.autoretrain_enabled:
+            self.statusBar().showMessage("自动重训策略已启动，将监控回测表现", 3000)
+        else:
+            self.statusBar().showMessage("自动重训策略已停止", 3000)
+    
     # ===== 投注计划管理功能 =====
     def add_investment_record(self):
         """添加投注记录"""
