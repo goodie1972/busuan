@@ -39,7 +39,7 @@ from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
     create_expected_value_tab, create_backtest_tab,
-    create_ziwei_tab, create_meihua_tab
+    create_ziwei_tab, create_meihua_tab, create_investment_plan_tab
 )
 from data_processing import (
     process_analysis_data, get_trend_features, prepare_recent_trend_data,
@@ -347,6 +347,21 @@ class LotteryPredictorApp(QMainWindow):
                 lines.append(f"  {rl.text()}")
                 lines.append(f"  {bl.text()}")
                 lines.append(f"  {dl.text()}")
+            text = "\n".join(lines)
+        elif tab_key == 'investment':
+            lines = ["═══ 投注计划记录 ═══"]
+            for row in range(self.investment_table.rowCount()):
+                vals = []
+                for col in range(self.investment_table.columnCount()):
+                    item = self.investment_table.item(row, col)
+                    vals.append(item.text() if item else "")
+                lines.append(f"  {' | '.join(vals)}")
+            # 统计信息
+            lines.append(f"\n总投入: {self.total_invested_label.text()}")
+            lines.append(f"总中奖: {self.total_won_label.text()}")
+            lines.append(f"净收益: {self.net_profit_label.text()}")
+            lines.append(f"ROI: {self.roi_label.text()}")
+            lines.append(f"中奖率: {self.win_rate_label.text()}")
             text = "\n".join(lines)
         return text.strip() if text else "(暂无结果)"
 
