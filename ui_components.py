@@ -242,11 +242,15 @@ def create_main_tab(main_tab):
     update_data_button = QPushButton("更新数据")
     update_data_button.setMinimumHeight(34)
     update_data_button.setStyleSheet(label_style)
+    auto_predict_button = QPushButton("一键智能预测")
+    auto_predict_button.setMinimumHeight(34)
+    auto_predict_button.setStyleSheet("font-size: 11pt; font-weight: bold; background-color: #4CAF50; color: white;")
     button_layout.addWidget(predict_button)
     button_layout.addWidget(train_button)
     button_layout.addWidget(pause_button)
     button_layout.addWidget(analyze_button)
     button_layout.addWidget(update_data_button)
+    button_layout.addWidget(auto_predict_button)
     main_layout.addLayout(button_layout)
 
     
@@ -292,7 +296,8 @@ def create_main_tab(main_tab):
             lottery_combo, prediction_spin, gpu_checkbox, result_label, log_box,
             theme_combo, customize_theme_button, model_combo,
             mode_combo, compound_red_spin, compound_blue_spin,
-            dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo)
+            dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo,
+            auto_predict_button)
 
 
 def create_analysis_tab(analysis_tab):

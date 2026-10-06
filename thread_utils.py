@@ -305,4 +305,158 @@ class BacktestThread(QThread):
                 self.log_signal.emit(traceback.format_exc())
             except Exception:
                 pass
-            self.finished_signal.emit(False) 
+            self.finished_signal.emit(False)
+
+
+class AutoPredictThread(QThread):
+    """一键智能预测线程：自动 fetch → train → predict → 存档
+    全流程在后台完成，通过信号通知主线程更新 UI。
+    """
+    log_signal = pyqtSignal(str)
+    step_signal = pyqtSignal(str)       # 当前步骤名
+    finished_signal = pyqtSignal(bool, str)  # (是否成功, 结果文本)
+
+    def __init__(self, lottery_type, model_type='gbdt', num_predictions=3,
+                 use_gpu=False, skip_fetch=False, skip_train=False):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.model_type = model_type
+        self.num_predictions = num_predictions
+        self.use_gpu = use_gpu
+        self.skip_fetch = skip_fetch
+        self.skip_train = skip_train
+        self.should_terminate = False
+
+    def run(self):
+        try:
+            import subprocess, sys as _sys
+
+            # ===== 第1步：更新数据 =====
+            if not self.skip_fetch:
+                self.step_signal.emit("正在更新数据...")
+                self.log_signal.emit(f"═══ 第1步/3: 更新{name_path[self.lottery_type]['name']}历史数据 ═══")
+
+                if getattr(_sys, 'frozen', False):
+                    base = os.path.dirname(_sys.executable)
+                else:
+                    base = "."
+
+                script = os.path.join(base, "scripts", self.lottery_type,
+                                      f"fetch_{self.lottery_type}_data.py")
+                self.log_signal.emit(f"执行: {script}")
+
+                proc = subprocess.Popen(
+                    [_sys.executable, script],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    universal_newlines=True, bufsize=1,
+                )
+                for line in iter(proc.stdout.readline, ''):
+                    if self.should_terminate:
+                        proc.terminate()
+                        self.log_signal.emit("已终止。")
+                        self.finished_signal.emit(False, "")
+                        return
+                    if line:
+                        self.log_signal.emit(line.strip())
+                proc.wait()
+                if proc.returncode != 0:
+                    self.log_signal.emit(f"数据更新失败 (exit {proc.returncode})")
+                    self.finished_signal.emit(False, "")
+                    return
+                self.log_signal.emit("数据更新完成。")
+            else:
+                self.log_signal.emit("跳过数据更新。")
+
+            if self.should_terminate:
+                self.finished_signal.emit(False, "")
+                return
+
+            # ===== 第2步：训练模型 =====
+            if not self.skip_train:
+                self.step_signal.emit("正在训练模型...")
+                self.log_signal.emit(f"═══ 第2步/3: 训练{MODEL_TYPES.get(self.model_type, self.model_type)}模型 ═══")
+
+                from scripts.data_analysis import load_lottery_data
+                df = load_lottery_data(self.lottery_type)
+                if df is None or df.empty:
+                    self.log_signal.emit("加载数据失败。")
+                    self.finished_signal.emit(False, "")
+                    return
+
+                self.log_signal.emit(f"已加载 {len(df)} 条历史数据。")
+
+                def _log(msg):
+                    if msg:
+                        self.log_signal.emit(msg)
+                    if self.should_terminate:
+                        raise Exception("用户终止")
+
+                ml_model = LotteryMLModels(
+                    lottery_type=self.lottery_type,
+                    model_type=self.model_type,
+                    log_callback=_log,
+                    use_gpu=self.use_gpu,
+                )
+                ml_model.train(df)
+                self.log_signal.emit("模型训练完成。")
+            else:
+                self.log_signal.emit("跳过模型训练。")
+
+            if self.should_terminate:
+                self.finished_signal.emit(False, "")
+                return
+
+            # ===== 第3步：生成预测 =====
+            self.step_signal.emit("正在生成预测...")
+            self.log_signal.emit(f"═══ 第3步/3: 生成{self.num_predictions}组预测 ═══")
+
+            from scripts.data_analysis import load_lottery_data
+            df = load_lottery_data(self.lottery_type)
+
+            ml_model = LotteryMLModels(
+                lottery_type=self.lottery_type,
+                model_type=self.model_type,
+                log_callback=lambda m: self.log_signal.emit(m) if m else None,
+                use_gpu=self.use_gpu,
+            )
+            if not ml_model.load_models():
+                self.log_signal.emit(f"模型加载失败，请先训练 {self.model_type} 模型。")
+                self.finished_signal.emit(False, "")
+                return
+
+            import pandas as pd
+            # 取最近 feature_window 期做输入
+            feature_window = getattr(ml_model, 'feature_window', 10)
+            recent = df.sort_values('期数', ascending=False).head(feature_window)
+            recent = recent.sort_values('期数', ascending=True)
+
+            lottery_name = name_path[self.lottery_type]['name']
+            result_lines = [f"【一键智能预测】{lottery_name} · {MODEL_TYPES.get(self.model_type, self.model_type)}"]
+            result_lines.append(f"基于最新 {len(df)} 条历史数据，生成 {self.num_predictions} 组预测：\n")
+
+            all_predictions = []
+            for i in range(self.num_predictions):
+                red, blue = ml_model.predict(recent, variation=i)
+                if self.lottery_type == 'dlt':
+                    line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {' '.join(f'{n:02d}' for n in blue)}"
+                else:
+                    line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {blue[0]:02d}"
+                result_lines.append(line)
+                all_predictions.append((red, blue))
+
+            result_text = "\n".join(result_lines)
+            self.log_signal.emit("预测生成完成。")
+            self.finished_signal.emit(True, result_text)
+
+        except Exception as e:
+            if "用户终止" in str(e):
+                self.log_signal.emit("一键预测已被终止。")
+            else:
+                self.log_signal.emit(f"一键预测出错: {str(e)}")
+                import traceback
+                self.log_signal.emit(traceback.format_exc())
+            self.finished_signal.emit(False, "")
+
+    def terminate(self):
+        self.should_terminate = True
+        super().terminate()

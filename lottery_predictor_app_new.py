@@ -29,7 +29,8 @@ from ml_models import (
     LotteryMLModels, MODEL_TYPES
 )
 from thread_utils import (
-    TrainModelThread, UpdateDataThread, LogEmitter, BacktestThread
+    TrainModelThread, UpdateDataThread, LogEmitter, BacktestThread,
+    AutoPredictThread
 )
 from prediction_utils import (
     process_predictions, randomize_numbers
@@ -63,6 +64,7 @@ class LotteryPredictorApp(QMainWindow):
         self.log_emitter.new_log.connect(self.update_log)
         self.train_thread = None
         self.update_thread = None
+        self.auto_predict_thread = None
         self.pause_state = False
         
         # 初始化主题管理器
@@ -128,7 +130,8 @@ class LotteryPredictorApp(QMainWindow):
         self.lottery_combo, self.prediction_spin, self.gpu_checkbox, self.result_label, self.log_box, \
         self.theme_combo, self.customize_theme_button, self.model_combo, \
         self.mode_combo, self.compound_red_spin, self.compound_blue_spin, \
-        self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo = create_main_tab(self.main_tab)
+        self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo, \
+        self.auto_predict_button = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -140,6 +143,9 @@ class LotteryPredictorApp(QMainWindow):
         self.customize_theme_button.clicked.connect(self.customize_theme)
         # 模型切换时更新预测模式可用性
         self.model_combo.currentTextChanged.connect(self.update_prediction_modes)
+        
+        # 一键智能预测按钮
+        self.auto_predict_button.clicked.connect(self.start_auto_predict)
         
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
@@ -1017,6 +1023,98 @@ class LotteryPredictorApp(QMainWindow):
         self.update_data_button.setEnabled(True)
         self.lottery_combo.setEnabled(True)
         self.update_log("数据更新线程已结束。")
+
+    def start_auto_predict(self):
+        """一键智能预测按钮点击处理"""
+        if self.auto_predict_thread and self.auto_predict_thread.isRunning():
+            self.update_log("一键智能预测正在进行中，请稍候...")
+            return
+
+        # 获取当前选择
+        lottery_index = self.lottery_combo.currentIndex()
+        lottery_keys = list(name_path.keys())
+        lottery_type = lottery_keys[lottery_index]
+
+        model_text = self.model_combo.currentText()
+        model_type = None
+        # 先检查 lstm-crf
+        for key, value in {'lstm-crf': 'LSTM-CRF (默认)'}.items():
+            if value == model_text:
+                model_type = key
+                break
+        if model_type is None:
+            for key, value in MODEL_TYPES.items():
+                if value == model_text:
+                    model_type = key
+                    break
+        if model_type is None:
+            self.update_log("错误：无法识别模型类型")
+            return
+
+        use_gpu = self.gpu_checkbox.isChecked()
+        num_pred = self.prediction_spin.value()
+
+        # 禁用相关控件防止重复点击
+        self.auto_predict_button.setEnabled(False)
+        self.predict_button.setEnabled(False)
+        self.train_button.setEnabled(False)
+        self.update_data_button.setEnabled(False)
+        self.lottery_combo.setEnabled(False)
+        self.model_combo.setEnabled(False)
+        self.gpu_checkbox.setEnabled(False)
+        self.prediction_spin.setEnabled(False)
+        self.statusBar().showMessage("一键智能预测已启动...")
+
+        # 清空结果区
+        self.result_label.setText("一键智能预测进行中，请稍候...")
+
+        # 创建并启动线程
+        self.auto_predict_thread = AutoPredictThread(
+            lottery_type=lottery_type,
+            model_type=model_type,
+            num_predictions=num_pred,
+            use_gpu=use_gpu,
+            skip_fetch=False,
+            skip_train=False
+        )
+        self.auto_predict_thread.log_signal.connect(self.update_log)
+        self.auto_predict_thread.step_signal.connect(lambda s: self.statusBar().showMessage(s))
+        self.auto_predict_thread.finished_signal.connect(self.on_auto_predict_finished)
+        self.auto_predict_thread.start()
+
+    def on_auto_predict_finished(self, success, result_text):
+        """一键智能预测完成回调"""
+        # 恢复控件状态
+        self.auto_predict_button.setEnabled(True)
+        self.predict_button.setEnabled(True)
+        self.train_button.setEnabled(True)
+        self.update_data_button.setEnabled(True)
+        self.lottery_combo.setEnabled(True)
+        self.model_combo.setEnabled(True)
+        self.gpu_checkbox.setEnabled(torch.cuda.is_available())
+        self.prediction_spin.setEnabled(True)
+        self.statusBar().clearMessage()
+
+        if success:
+            self.result_label.setText(result_text)
+            self.update_log("一键智能预测完成。")
+            # 自动存档（复用现有存档机制）
+            from prediction_records import save_prediction_record
+            try:
+                # 解析 result_text 取号码（这里简化：直接保存全文）
+                save_prediction_record(
+                    lottery_type=self.lottery_combo.currentText(),
+                    model_type=self.model_combo.currentText(),
+                    latest_period="自动预测",
+                    numbers_text=result_text,
+                    log_callback=self.update_log
+                )
+                self.update_log("预测记录已自动存档。")
+            except Exception as e:
+                self.update_log(f"存档预测记录时出错: {e}")
+        else:
+            self.result_label.setText("一键智能预测失败，请查看日志了解详情。")
+            self.update_log("一键智能预测失败。")
 
     def pause_resume_training(self):
         if self.training_thread and self.training_thread.isRunning():
