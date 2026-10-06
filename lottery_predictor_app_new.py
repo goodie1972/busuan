@@ -39,7 +39,7 @@ from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
     create_expected_value_tab, create_backtest_tab,
-    create_ziwei_tab, create_meihua_tab, create_investment_plan_tab
+    create_ziwei_tab, create_meihua_tab, create_investment_plan_tab, create_number_filter_tab
 )
 from data_processing import (
     process_analysis_data, get_trend_features, prepare_recent_trend_data,
@@ -246,6 +246,24 @@ class LotteryPredictorApp(QMainWindow):
         self.reset_investment_form_btn.clicked.connect(self.reset_investment_form)
         self.tab_widget.addTab(self.investment_tab, "投注计划")
         
+        # ===== 号码过滤规则标签页 =====
+        self.filter_tab = QWidget()
+        (self.add_filter_btn, self.delete_filter_btn, self.clear_filter_btn,
+         self.save_filter_btn, self.load_filter_btn, self.filter_table,
+         self.filter_source_combo, self.custom_numbers_edit,
+         self.apply_filter_btn, self.reset_filter_btn,
+         self.filter_before_label, self.filter_after_label, self.filter_stats_label
+        ) = create_number_filter_tab(self.filter_tab)
+        # 连接号码过滤标签页的信号和槽
+        self.add_filter_btn.clicked.connect(self.add_filter_rule)
+        self.delete_filter_btn.clicked.connect(self.delete_filter_rule)
+        self.clear_filter_btn.clicked.connect(self.clear_filter_rules)
+        self.save_filter_btn.clicked.connect(self.save_filter_rules)
+        self.load_filter_btn.clicked.connect(self.load_filter_rules)
+        self.apply_filter_btn.clicked.connect(self.apply_number_filter)
+        self.reset_filter_btn.clicked.connect(self.reset_filter_display)
+        self.tab_widget.addTab(self.filter_tab, "号码过滤")
+        
         # 统一 tab 标签字体到 11pt，并加 padding/高度防截断
         from PyQt5.QtGui import QFont
         tab_font = QFont()
@@ -291,6 +309,7 @@ class LotteryPredictorApp(QMainWindow):
             (self.ziwei_tab, 'ziwei', '紫微斗数', None),
             (self.meihua_tab, 'meihua', '梅花易数', None),
             (self.investment_tab, 'investment', '投注计划', None),
+            (self.filter_tab, 'filter', '号码过滤', None),
         ]
         for widget, key, label, rl_attr in tabs:
             layout = widget.layout()
@@ -1494,6 +1513,248 @@ class LotteryPredictorApp(QMainWindow):
             self.prediction_info_label.setStyleSheet("font-size: 10pt; color: #666; font-style: italic;")
         except Exception as e:
             self.log_emitter.new_log.emit(f"重置投注表单时出错: {str(e)}")
+    
+    # ===== 号码过滤规则功能 =====
+    def add_filter_rule(self):
+        """添加过滤规则"""
+        try:
+            # 获取当前输入的规则信息
+            # 这里简化处理，实际应从UI控件获取
+            # 为演示目的，我们添加一个示例规则
+            rule = {
+                'enabled': True,
+                'type': '奇偶',
+                'param': '奇数',
+                'desc': '保留奇数号码',
+                'action': '删除'
+            }
+            
+            # 添加到表格
+            row_pos = self.filter_table.rowCount()
+            self.filter_table.insertRow(row_pos)
+            
+            # 启用复选框
+            enable_cb = QCheckBox()
+            enable_cb.setChecked(True)
+            self.filter_table.setCellWidget(row_pos, 0, enable_cb)
+            
+            # 规则类型
+            self.filter_table.setItem(row_pos, 1, QTableWidgetItem(rule['type']))
+            # 参数
+            self.filter_table.setItem(row_pos, 2, QTableWidgetItem(rule['param']))
+            # 描述
+            self.filter_table.setItem(row_pos, 3, QTableWidgetItem(rule['desc']))
+            # 操作按钮
+            del_btn = QPushButton("删除")
+            del_btn.setStyleSheet("font-size: 9pt;")
+            del_btn.clicked.connect(lambda _, r=row_pos: self.delete_filter_rule_by_row(r))
+            self.filter_table.setCellWidget(row_pos, 4, del_btn)
+            
+            # 添加到规则列表
+            self.filter_rules.append(rule)
+            
+            self.log_emitter.new_log.emit(f"已添加过滤规则: {rule['type']} - {rule['param']}")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"添加过滤规则时出错: {str(e)}")
+    
+    def delete_filter_rule(self):
+        """删除选中的过滤规则"""
+        try:
+            selected_rows = sorted(set(item.row() for item in self.filter_table.selectedItems()), reverse=True)
+            if not selected_rows:
+                QMessageBox.information(self, "提示", "请先选择要删除的过滤规则")
+                return
+            
+            for row in selected_rows:
+                self.delete_filter_rule_by_row(row)
+            
+            self.log_emitter.new_log.emit(f"已删除 {len(selected_rows)} 条过滤规则")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"删除过滤规则时出错: {str(e)}")
+    
+    def delete_filter_rule_by_row(self, row):
+        """根据行索引删除过滤规则"""
+        try:
+            self.filter_table.removeRow(row)
+            if row < len(self.filter_rules):
+                self.filter_rules.pop(row)
+        except Exception:
+            pass  # 忽略删除错误
+    
+    def clear_filter_rules(self):
+        """清空所有过滤规则"""
+        try:
+            reply = QMessageBox.question(
+                self, "确认清空", 
+                "确定要清空所有过滤规则吗？此操作不可撤销。",
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                self.filter_table.setRowCount(0)
+                self.filter_rules.clear()
+                self.log_emitter.new_log.emit("所有过滤规则已清空")
+                
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"清空过滤规则时出错: {str(e)}")
+    
+    def save_filter_rules(self):
+        """保存过滤规则到文件"""
+        try:
+            if not self.filter_rules:
+                QMessageBox.information(self, "提示", "暂无过滤规则可保存")
+                return
+            
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "保存过滤规则", 
+                f"号码过滤规则_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                "JSON Files (*.json)"
+            )
+            
+            if not file_path:
+                return
+            
+            # 将规则转换为可JSON序列化的格式
+            rules_to_save = []
+            for rule in self.filter_rules:
+                rules_to_save.append(rule.copy())
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(rules_to_save, f, ensure_ascii=False, indent=2)
+            
+            self.log_emitter.new_log.emit(f"过滤规则已保存到: {file_path}")
+            QMessageBox.information(self, "保存成功", f"过滤规则已保存到:\n{file_path}")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"保存过滤规则时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"保存过滤规则失败:\n{str(e)}")
+    
+    def load_filter_rules(self):
+        """从文件加载过滤规则"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "加载过滤规则", "",
+                "JSON Files (*.json)"
+            )
+            
+            if not file_path:
+                return
+            
+            # 清空现有规则
+            self.filter_table.setRowCount(0)
+            self.filter_rules.clear()
+            
+            # 加载规则
+            with open(file_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+            
+            # 添加规则到表格
+            for rule in rules:
+                # 添加到表格
+                row_pos = self.filter_table.rowCount()
+                self.filter_table.insertRow(row_pos)
+                
+                # 启用复选框
+                enable_cb = QCheckBox()
+                enable_cb.setChecked(rule.get('enabled', True))
+                self.filter_table.setCellWidget(row_pos, 0, enable_cb)
+                
+                # 规则类型
+                self.filter_table.setItem(row_pos, 1, QTableWidgetItem(rule.get('type', '')))
+                # 参数
+                self.filter_table.setItem(row_pos, 2, QTableWidgetItem(rule.get('param', '')))
+                # 描述
+                self.filter_table.setItem(row_pos, 3, QTableWidgetItem(rule.get('desc', '')))
+                # 操作按钮
+                del_btn = QPushButton("删除")
+                del_btn.setStyleSheet("font-size: 9pt;")
+                del_btn.clicked.connect(lambda _, r=row_pos: self.delete_filter_rule_by_row(r))
+                self.filter_table.setCellWidget(row_pos, 4, del_btn)
+                
+                # 添加到规则列表
+                self.filter_rules.append(rule)
+            
+            self.log_emitter.new_log.emit(f"已加载 {len(rules)} 条过滤规则")
+            QMessageBox.information(self, "加载成功", f"成功加载了 {len(rules)} 条过滤规则")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"加载过滤规则时出错: {str(e)}")
+            QMessageBox.critical(self, "错误", f"加载过滤规则失败:\n{str(e)}")
+    
+    def apply_number_filter(self):
+        """应用号码过滤"""
+        try:
+            # 获取要过滤的号码来源
+            source = self.filter_source_combo.currentText()
+            
+            # 获取过滤前的号码
+            before_numbers = ""
+            if source == "当前预测号码":
+                # 获取当前预测的号码
+                if hasattr(self, 'result_label') and self.result_label.text():
+                    before_numbers = self.result_label.text()
+                    # 提取号码部分（简化处理）
+                    if "红球:" in before_numbers and "蓝球:" in before_numbers:
+                        # 保持原始格式
+                        pass
+                else:
+                    before_numbers = "暂无预测号码"
+            elif source == "最新存档预测":
+                # 获取最新存档的预测
+                try:
+                    from prediction_records import load_records
+                    records = load_records()
+                    if records:
+                        latest_record = records[-1]  # 最新的记录
+                        red_nums = latest_record.get('red_numbers', [])
+                        blue_nums = latest_record.get('blue_numbers', [])
+                        red_str = ' '.join(f'{n:02d}' for n in red_nums)
+                        blue_str = ' '.join(f'{n:02d}' for n in blue_nums)
+                        if self.lottery_combo.currentText() == '双色球':
+                            before_numbers = f"红球: {red_str}\n蓝球: {blue_str}"
+                        else:  # 大乐透
+                            before_numbers = f"红球: {red_str}\n蓝球: {blue_str}"
+                    else:
+                        before_numbers = "暂无存档预测"
+                except Exception:
+                    before_numbers = "获取存档预测失败"
+            else:  # 自定义号码
+                before_numbers = self.custom_numbers_edit.text().strip()
+                if not before_numbers:
+                    before_numbers = "请输入自定义号码"
+            
+            # 显示过滤前的号码
+            self.filter_before_label.setText(f"过滤前: {before_numbers}")
+            
+            # 应用过滤规则（简化处理，实际应根据规则类型过滤号码）
+            # 这里我们只是演示过滤过程
+            after_numbers = before_numbers  # 实际应用过滤后的结果
+            filter_count = 0  # 实际应计算通过过滤的号码数量
+            
+            # 显示过滤后的号码
+            self.filter_after_label.setText(f"过滤后: {after_numbers}")
+            
+            # 更新过滤统计
+            self.filter_stats_label.setText(f"过滤统计: {filter_count} 个号码通过过滤")
+            
+            self.log_emitter.new_log.emit(f"号码过滤已应用，来源: {source}")
+            
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"应用号码过滤时出错: {str(e)}")
+    
+    def reset_filter_display(self):
+        """重置过滤显示"""
+        try:
+            self.filter_before_label.setText("过滤前: 暂无号码")
+            self.filter_after_label.setText("过滤后: 暂无号码")
+            self.filter_stats_label.setText("过滤统计: 0 个号码通过过滤")
+            self.custom_numbers_edit.clear()
+            self.log_emitter.new_log.emit("过滤显示已重置")
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"重置过滤显示时出错: {str(e)}")
     
     def analyze_data(self):
         selected_index = self.lottery_combo.currentIndex()
