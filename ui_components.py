@@ -1400,7 +1400,7 @@ def create_number_filter_tab(filter_tab):
 
     # 过滤结果显示
     result_group = QGroupBox("过滤结果")
-    result_layout = VBoxLayout(result_group)
+    result_layout = QVBoxLayout(result_group)
 
     # 过滤前号码显示
     filter_before_label = QLabel("过滤前: 暂无号码")
