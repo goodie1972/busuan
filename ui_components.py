@@ -245,12 +245,16 @@ def create_main_tab(main_tab):
     auto_predict_button = QPushButton("一键智能预测")
     auto_predict_button.setMinimumHeight(34)
     auto_predict_button.setStyleSheet("font-size: 11pt; font-weight: bold; background-color: #4CAF50; color: white;")
+    compare_button = QPushButton("多模型对比")
+    compare_button.setMinimumHeight(34)
+    compare_button.setStyleSheet("font-size: 11pt; font-weight: bold; background-color: #2196F3; color: white;")
     button_layout.addWidget(predict_button)
     button_layout.addWidget(train_button)
     button_layout.addWidget(pause_button)
     button_layout.addWidget(analyze_button)
     button_layout.addWidget(update_data_button)
     button_layout.addWidget(auto_predict_button)
+    button_layout.addWidget(compare_button)
     main_layout.addLayout(button_layout)
 
     
@@ -297,7 +301,7 @@ def create_main_tab(main_tab):
             theme_combo, customize_theme_button, model_combo,
             mode_combo, compound_red_spin, compound_blue_spin,
             dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo,
-            auto_predict_button)
+            auto_predict_button, compare_button)
 
 
 def create_analysis_tab(analysis_tab):

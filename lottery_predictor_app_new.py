@@ -131,7 +131,7 @@ class LotteryPredictorApp(QMainWindow):
         self.theme_combo, self.customize_theme_button, self.model_combo, \
         self.mode_combo, self.compound_red_spin, self.compound_blue_spin, \
         self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo, \
-        self.auto_predict_button = create_main_tab(self.main_tab)
+        self.auto_predict_button, self.compare_button = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -146,6 +146,8 @@ class LotteryPredictorApp(QMainWindow):
         
         # 一键智能预测按钮
         self.auto_predict_button.clicked.connect(self.start_auto_predict)
+        # 多模型对比按钮
+        self.compare_button.clicked.connect(self.compare_models)
         
         # 创建数据分析标签页
         self.analysis_tab = QWidget()
@@ -1154,6 +1156,204 @@ class LotteryPredictorApp(QMainWindow):
         else:
             self.result_label.setText("一键智能预测失败，请查看日志了解详情。")
             self.update_log("一键智能预测失败。")
+
+    def compare_models(self):
+        """多模型对比预测：同期数、相同参数下，比较多个模型的预测结果"""
+        if self.compare_button and self.compare_button.isEnabled() == False:
+            return
+            
+        # 获取当前选择
+        lottery_index = self.lottery_combo.currentIndex()
+        lottery_keys = list(name_path.keys())
+        lottery_type = lottery_keys[lottery_index]
+        lottery_name = name_path[lottery_type]['name']
+        num_predictions = self.prediction_spin.value()
+        
+        # 禁用相关控件防止重复点击
+        self.compare_button.setEnabled(False)
+        self.predict_button.setEnabled(False)
+        self.train_button.setEnabled(False)
+        self.update_data_button.setEnabled(False)
+        self.auto_predict_button.setEnabled(False)
+        self.lottery_combo.setEnabled(False)
+        self.model_combo.setEnabled(False)
+        self.gpu_checkbox.setEnabled(False)
+        self.prediction_spin.setEnabled(False)
+        self.statusBar().showMessage("多模型对比进行中，请稍候...")
+        
+        # 清空结果区
+        self.result_label.setText("多模型对比进行中，请稍候...")
+        self.log_box.clear()
+        
+        # 记录开始时间
+        import time
+        start_time = time.time()
+        
+        # 要对比的模型列表（排除不支持复式/胆拖的模型和传统算法）
+        compare_models = ['random_forest', 'xgboost', 'gbdt', 'lightgbm', 'catboost', 'ensemble']
+        model_names = {key: MODEL_TYPES[key] for key in compare_models if key in MODEL_TYPES}
+        
+        # 结果存储
+        all_results = {}
+        success_count = 0
+        
+        try:
+            df = load_lottery_data(lottery_type)
+            recent_data = df.sort_values('期数', ascending=False).head(10)  # 使用较小窗口以加快速度
+            
+            for model_key, model_name in model_names.items():
+                self.log_emitter.new_log.emit(f"正在测试 {model_name}...")
+                
+                try:
+                    # 检查模型是否已经训练
+                    model_full_key = f"{lottery_type}_{model_key}"
+                    if model_full_key not in self.ml_models:
+                        self.log_emitter.new_log.emit(f"初始化 {model_name} 模型...")
+                        
+                        use_gpu = self.gpu_checkbox.isChecked()
+                        self.ml_models[model_full_key] = LotteryMLModels(
+                            lottery_type=lottery_type, 
+                            model_type=model_key,
+                            log_callback=self.log_emitter.new_log.emit,
+                            use_gpu=use_gpu
+                        )
+                    
+                    ml_model = self.ml_models[model_full_key]
+                    
+                    # 特殊处理期望值模型（不参与对比，因为通常不提供概率）
+                    if model_key == 'expected_value':
+                        self.log_emitter.new_log.emit(f"跳过 {model_name}（通常不提供具体号码预测）")
+                        continue
+                    
+                    # 检查模型是否可用
+                    if not ml_model.load_models():
+                        self.log_emitter.new_log.emit(f"跳过 {model_name}（模型尚未训练）")
+                        continue
+                    
+                    # 单式预测
+                    red_numbers, blue_numbers = ml_model.predict(recent_data, variation=0)
+                    
+                    if red_numbers is None or blue_numbers is None:
+                        raise ValueError("预测返回空结果")
+                    
+                    # 格式化结果
+                    if lottery_type == "dlt":
+                        result_str = f"{' '.join(map(str, red_numbers))} + {' '.join(map(str, blue_numbers))}"
+                    else:
+                        result_str = f"{' '.join(map(str, red_numbers))} + {str(blue_numbers[0])}"
+                    
+                    all_results[model_name] = {
+                        'red': list(red_numbers),
+                        'blue': list(blue_numbers) if lottery_type == "dlt" else [int(blue_numbers[0])],
+                        'display': result_str,
+                        'success': True
+                    }
+                    success_count += 1
+                    self.log_emitter.new_log.emit(f"{model_name} 预测成功: {result_str}")
+                    
+                except Exception as model_e:
+                    self.log_emitter.new_log.emit(f"{model_name} 预测失败: {str(model_e)}")
+                    all_results[model_name] = {
+                        'success': False,
+                        'error': str(model_e)
+                    }
+            
+            # 生成对比结果文本
+            result_text = f"【多模型对比预测】{lottery_name}\n"
+            result_text += f"最新期: {int(df['期数'].max())}\n"
+            result_text += f"对比模型: {len(model_names)} 个\n"
+            result_text += f"成功预测: {success_count} 个\n\n"
+            
+            # 显示每个模型的预测结果
+            for model_name, result in all_results.items():
+                if result['success']:
+                    result_text += f"{model_name}: {result['display']}\n"
+                else:
+                    result_text += f"{model_name}: 预测失败 ({result.get('error', '未知错误')})\n"
+            
+            # 添加简单共识分析（如果有足够成功的预测）
+            if success_count >= 2:
+                result_text += "\n--- 号码频率分析（成功模型） ---\n"
+                
+                if lottery_type == "dlt":
+                    # 红球频率
+                    red_counts = {}
+                    blue_counts = {}
+                    for model_name, result in all_results.items():
+                        if result['success']:
+                            for num in result['red']:
+                                red_counts[num] = red_counts.get(num, 0) + 1
+                            for num in result['blue']:
+                                blue_counts[num] = blue_counts.get(num, 0) + 1
+                    
+                    if red_counts:
+                        max_red_count = max(red_counts.values())
+                        hot_red = [str(num) for num, cnt in red_counts.items() if cnt == max_red_count]
+                        result_text += f"热门红球 (出现{max_red_count}次): {' '.join(hot_red)}\n"
+                    
+                    if blue_counts:
+                        max_blue_count = max(blue_counts.values())
+                        hot_blue = [str(num) for num, cnt in blue_counts.items() if cnt == max_blue_count]
+                        result_text += f"热门蓝球 (出现{max_blue_count}次): {' '.join(hot_blue)}\n"
+                else:
+                    # 双色球
+                    red_counts = {}
+                    blue_counts = {}
+                    for model_name, result in all_results.items():
+                        if result['success']:
+                            for num in result['red']:
+                                red_counts[num] = red_counts.get(num, 0) + 1
+                            blue_num = result['blue'][0]
+                            blue_counts[blue_num] = blue_counts.get(blue_num, 0) + 1
+                    
+                    if red_counts:
+                        max_red_count = max(red_counts.values())
+                        hot_red = [str(num) for num, cnt in red_counts.items() if cnt == max_red_count]
+                        result_text += f"热门红球 (出现{max_red_count}次): {' '.join(hot_red)}\n"
+                    
+                    if blue_counts:
+                        max_blue_count = max(blue_counts.values())
+                        hot_blue = [str(num) for num, cnt in blue_counts.items() if cnt == max_blue_count]
+                        result_text += f"热门蓝球 (出现{max_blue_count}次): {' '.join(hot_blue)}\n"
+            
+            used_time = time.time() - start_time
+            result_text += f"\n总用时: {used_time:.1f} 秒"
+            
+            self.result_label.setText(result_text)
+            
+            # 恢复控件状态
+            self.compare_button.setEnabled(True)
+            self.predict_button.setEnabled(True)
+            self.train_button.setEnabled(True)
+            self.update_data_button.setEnabled(True)
+            self.auto_predict_button.setEnabled(True)
+            self.lottery_combo.setEnabled(True)
+            self.model_combo.setEnabled(True)
+            self.gpu_checkbox.setEnabled(True)
+            self.prediction_spin.setEnabled(True)
+            
+            self.statusBar().showMessage(f"多模型对比完成 - 成功 {success_count}/{len(model_names)} 模型", 5000)
+            self.log_emitter.new_log.emit(f"多模型对比完成: 成功 {success_count}/{len(model_names)} 模型, 用时 {used_time:.1f}s")
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            self.log_emitter.new_log.emit(f"多模型对比时出错: {e}")
+            self.log_emitter.new_log.emit(f"错误详情:\n{error_details}")
+            self.result_label.setText(f"多模型对比时出错: {e}")
+            
+            # 即使出错也要恢复控件状态
+            self.compare_button.setEnabled(True)
+            self.predict_button.setEnabled(True)
+            self.train_button.setEnabled(True)
+            self.update_data_button.setEnabled(True)
+            self.auto_predict_button.setEnabled(True)
+            self.lottery_combo.setEnabled(True)
+            self.model_combo.setEnabled(True)
+            self.gpu_checkbox.setEnabled(True)
+            self.prediction_spin.setEnabled(True)
+            
+            self.statusBar().showMessage("多模型对比失败", 5000)
 
     def pause_resume_training(self):
         if self.training_thread and self.training_thread.isRunning():
