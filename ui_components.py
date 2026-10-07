@@ -7,7 +7,9 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QPushButton, QLabel, QComboBox, QWidget, 
     QTextEdit, QSpinBox, QHBoxLayout, QTabWidget, QScrollArea, 
     QGridLayout, QCheckBox, QGroupBox, QFormLayout, QMainWindow,
-    QMenu, QAction, QToolButton
+    QMenu, QAction, QToolButton, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView, QDoubleSpinBox, QLineEdit,
+    QFileDialog, QMessageBox
 )
 from PyQt5.QtCore import Qt
 from theme_manager import ThemeManager, CustomThemeDialog
@@ -1458,4 +1460,182 @@ def create_number_filter_tab(filter_tab):
         apply_filter_btn, reset_filter_btn,
         filter_before_label, filter_after_label, filter_stats_label
     )
+
+
+def create_prediction_records_tab(records_tab):
+    """
+    创建预测记录标签页：展示全部预测记录，支持筛选/核验/导出
+
+    Returns:
+        tuple: (refresh_btn, verify_btn, verify_all_btn, export_btn, delete_btn,
+               records_table, filter_lottery_combo, filter_model_combo,
+               filter_status_combo, stats_label)
+    """
+    layout = QVBoxLayout(records_tab)
+    layout.setSpacing(6)
+    layout.setContentsMargins(8, 8, 8, 8)
+
+    # ---- 筛选区 ----
+    filter_layout = QHBoxLayout()
+    filter_layout.addWidget(QLabel("彩票类型:"))
+    filter_lottery_combo = QComboBox()
+    filter_lottery_combo.addItems(["全部", "双色球", "大乐透"])
+    filter_layout.addWidget(filter_lottery_combo)
+    filter_layout.addSpacing(10)
+    filter_layout.addWidget(QLabel("模型:"))
+    filter_model_combo = QComboBox()
+    filter_model_combo.addItems(["全部", "LSTM-CRF", "随机森林", "XGBoost",
+                                 "梯度提升树", "集成模型", "LightGBM",
+                                 "CatBoost", "紫微斗数", "梅花易数"])
+    filter_layout.addWidget(filter_model_combo)
+    filter_layout.addSpacing(10)
+    filter_layout.addWidget(QLabel("状态:"))
+    filter_status_combo = QComboBox()
+    filter_status_combo.addItems(["全部", "待核验", "已核验", "已中奖"])
+    filter_layout.addWidget(filter_status_combo)
+    filter_layout.addStretch()
+    layout.addLayout(filter_layout)
+
+    # ---- 按钮区 ----
+    btn_layout = QHBoxLayout()
+    refresh_btn = QPushButton("刷新记录")
+    verify_btn = QPushButton("核验选中")
+    verify_all_btn = QPushButton("全部核验")
+    export_btn = QPushButton("导出CSV")
+    delete_btn = QPushButton("删除选中")
+    for btn in [refresh_btn, verify_btn, verify_all_btn, export_btn, delete_btn]:
+        btn.setMinimumHeight(32)
+        btn.setStyleSheet("font-size: 11pt;")
+        btn_layout.addWidget(btn)
+    btn_layout.addStretch()
+    layout.addLayout(btn_layout)
+
+    # ---- 记录表格 ----
+    records_table = QTableWidget()
+    records_table.setColumnCount(10)
+    records_table.setHorizontalHeaderLabels([
+        "序号", "预测时间", "彩票", "模型", "最新期号",
+        "红球", "蓝球", "核验状态", "奖级", "奖金(元)"
+    ])
+    records_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    records_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    records_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    records_table.setMinimumHeight(300)
+    layout.addWidget(records_table, 1)
+
+    # ---- 统计标签 ----
+    stats_label = QLabel("共 0 条记录 | 0 条已核验 | 0 条中奖")
+    stats_label.setStyleSheet("font-size: 11pt; padding: 4px;")
+    layout.addWidget(stats_label)
+
+    return (refresh_btn, verify_btn, verify_all_btn, export_btn, delete_btn,
+            records_table, filter_lottery_combo, filter_model_combo,
+            filter_status_combo, stats_label)
+
+
+def create_investment_plan_tab_new(investment_tab):
+    """
+    重做投注计划管理标签页：从预测记录勾选→设倍数→确认投注
+
+    Returns:
+        tuple: (load_predictions_btn, confirm_invest_btn, verify_btn,
+                export_btn, clear_btn, prediction_select_table,
+                multiplier_spin, investment_table,
+                total_invested_label, total_won_label, net_profit_label,
+                roi_label, win_rate_label)
+    """
+    layout = QVBoxLayout(investment_tab)
+    layout.setSpacing(6)
+    layout.setContentsMargins(8, 8, 8, 8)
+
+    # ---- 上半区：从预测记录选择 ----
+    pred_group = QGroupBox("第一步：从预测记录中选择要投注的号码")
+    pred_layout = QVBoxLayout(pred_group)
+
+    pred_btn_row = QHBoxLayout()
+    load_predictions_btn = QPushButton("加载最近预测")
+    load_predictions_btn.setMinimumHeight(32)
+    load_predictions_btn.setStyleSheet("font-size: 11pt;")
+    pred_btn_row.addWidget(load_predictions_btn)
+    pred_btn_row.addStretch()
+
+    pred_layout_row2 = QHBoxLayout()
+    pred_layout_row2.addWidget(QLabel("投注倍数:"))
+    multiplier_spin = QSpinBox()
+    multiplier_spin.setRange(1, 99)
+    multiplier_spin.setValue(1)
+    multiplier_spin.setStyleSheet("font-size: 11pt;")
+    pred_layout_row2.addWidget(multiplier_spin)
+    pred_layout_row2.addStretch()
+
+    confirm_invest_btn = QPushButton("确认投注")
+    confirm_invest_btn.setMinimumHeight(32)
+    confirm_invest_btn.setStyleSheet(
+        "font-size: 11pt; font-weight: bold; background-color: #4CAF50; color: white;")
+    pred_layout_row2.addWidget(confirm_invest_btn)
+
+    pred_btn_row.addLayout(pred_layout_row2)
+    pred_layout.addLayout(pred_btn_row)
+
+    prediction_select_table = QTableWidget()
+    prediction_select_table.setColumnCount(7)
+    prediction_select_table.setHorizontalHeaderLabels([
+        "选择", "预测时间", "彩票", "模型", "红球", "蓝球", "最新期号"
+    ])
+    prediction_select_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    prediction_select_table.setMinimumHeight(180)
+    pred_layout.addWidget(prediction_select_table)
+    layout.addWidget(pred_group)
+
+    # ---- 下半区：投注记录 ----
+    invest_group = QGroupBox("第二步：投注记录与核验")
+    invest_layout = QVBoxLayout(invest_group)
+
+    invest_btn_row = QHBoxLayout()
+    verify_btn = QPushButton("核验选中")
+    verify_btn.setMinimumHeight(32)
+    verify_btn.setStyleSheet("font-size: 11pt;")
+    invest_btn_row.addWidget(verify_btn)
+    export_btn = QPushButton("导出CSV")
+    export_btn.setMinimumHeight(32)
+    export_btn.setStyleSheet("font-size: 11pt;")
+    invest_btn_row.addWidget(export_btn)
+    clear_btn = QPushButton("清空全部")
+    clear_btn.setMinimumHeight(32)
+    clear_btn.setStyleSheet("font-size: 11pt;")
+    invest_btn_row.addWidget(clear_btn)
+    invest_btn_row.addStretch()
+    invest_layout.addLayout(invest_btn_row)
+
+    investment_table = QTableWidget()
+    investment_table.setColumnCount(9)
+    investment_table.setHorizontalHeaderLabels([
+        "投注时间", "彩票", "期号", "模型", "红球+蓝球",
+        "倍数", "投入(元)", "奖级", "盈亏(元)"
+    ])
+    investment_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    investment_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    investment_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    investment_table.setMinimumHeight(180)
+    invest_layout.addWidget(investment_table)
+
+    # 统计区
+    stats_row = QHBoxLayout()
+    total_invested_label = QLabel("总投入: 0.00 元")
+    total_won_label = QLabel("总中奖: 0.00 元")
+    net_profit_label = QLabel("净盈亏: 0.00 元")
+    roi_label = QLabel("ROI: 0.00%")
+    win_rate_label = QLabel("中奖率: 0.00%")
+    for lbl in [total_invested_label, total_won_label, net_profit_label,
+                roi_label, win_rate_label]:
+        lbl.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        stats_row.addWidget(lbl)
+    invest_layout.addLayout(stats_row)
+    layout.addWidget(invest_group)
+
+    return (load_predictions_btn, confirm_invest_btn, verify_btn,
+            export_btn, clear_btn, prediction_select_table,
+            multiplier_spin, investment_table,
+            total_invested_label, total_won_label, net_profit_label,
+            roi_label, win_rate_label)
 
