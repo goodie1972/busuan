@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton,
     QLabel, QComboBox, QWidget, QTextEdit, QSpinBox, QHBoxLayout,
     QTabWidget, QScrollArea, QGridLayout, QCheckBox, QGroupBox, QFormLayout,
-    QMenu, QAction
+    QMenu, QAction, QMessageBox, QInputDialog, QLineEdit, QFileDialog
 )
 from PyQt5.QtCore import pyqtSignal, QObject, QThread, Qt, QTimer
 from PyQt5.QtGui import QPixmap, QTextDocument
