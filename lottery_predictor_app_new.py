@@ -15,7 +15,8 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton,
     QLabel, QComboBox, QWidget, QTextEdit, QSpinBox, QHBoxLayout,
     QTabWidget, QScrollArea, QGridLayout, QCheckBox, QGroupBox, QFormLayout,
-    QMenu, QAction, QMessageBox, QInputDialog, QLineEdit, QFileDialog
+    QMenu, QAction, QMessageBox, QInputDialog, QLineEdit, QFileDialog,
+    QTableWidgetItem, QTableWidget, QHeaderView, QAbstractItemView
 )
 from PyQt5.QtCore import pyqtSignal, QObject, QThread, Qt, QTimer
 from PyQt5.QtGui import QPixmap, QTextDocument
@@ -39,8 +40,8 @@ from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
     create_expected_value_tab, create_backtest_tab,
-    create_ziwei_tab, create_meihua_tab, create_investment_plan_tab,
-    create_number_filter_tab, create_prediction_records_tab,
+    create_ziwei_tab, create_meihua_tab,
+    create_prediction_records_tab,
     create_investment_plan_tab_new
 )
 from data_processing import (
@@ -386,6 +387,17 @@ class LotteryPredictorApp(QMainWindow):
             lines.append(f"ROI: {self.roi_label.text()}")
             lines.append(f"中奖率: {self.win_rate_label.text()}")
             text = "\n".join(lines)
+        elif tab_key == 'records':
+            lines = ["═══ 预测记录 ═══"]
+            for row in range(self.records_table.rowCount()):
+                vals = []
+                for col in range(self.records_table.columnCount()):
+                    item = self.records_table.item(row, col)
+                    vals.append(item.text() if item else "")
+                lines.append(f"  {' | '.join(vals)}")
+            # 统计信息
+            lines.append(f"\n{self.rec_stats_label.text()}")
+            text = "\n".join(lines)
         return text.strip() if text else "(暂无结果)"
 
     def _copy_result(self, tab_key):
@@ -488,18 +500,18 @@ class LotteryPredictorApp(QMainWindow):
         
         # 获取选择的模型类型
         model_text = self.model_combo.currentText()
+        # 移除" (默认)"后缀以匹配 MODEL_TYPES
+        model_text_clean = model_text.replace(" (默认)", "").replace(" (默认)", "")
         
         # 从文本映射回模型键
         model_type = None
-        for key, value in {'lstm-crf': 'LSTM-CRF (默认)'}.items():
-            if value == model_text:
+        for key, value in MODEL_TYPES.items():
+            if value == model_text or value == model_text_clean:
                 model_type = key
                 break
-        if model_type is None:
-            for key, value in MODEL_TYPES.items():
-                if value == model_text:
-                    model_type = key
-                    break
+        # LSTM-CRF 特殊处理（不在 MODEL_TYPES 中）
+        if model_type is None and 'LSTM' in model_text:
+            model_type = 'lstm-crf'
 
         # 检查GPU状态
         use_gpu = self.gpu_checkbox.isChecked()
@@ -566,18 +578,18 @@ class LotteryPredictorApp(QMainWindow):
         
         # 获取选择的模型类型
         model_text = self.model_combo.currentText()
+        # 移除" (默认)"后缀以匹配 MODEL_TYPES
+        model_text_clean = model_text.replace(" (默认)", "").replace(" (默认)", "")
         
         # 从文本映射回模型键
         model_type = None
-        for key, value in {'lstm-crf': 'LSTM-CRF (默认)'}.items():
-            if value == model_text:
+        for key, value in MODEL_TYPES.items():
+            if value == model_text or value == model_text_clean:
                 model_type = key
                 break
-        if model_type is None:
-            for key, value in MODEL_TYPES.items():
-                if value == model_text:
-                    model_type = key
-                    break
+        # LSTM-CRF 特殊处理（不在 MODEL_TYPES 中）
+        if model_type is None and 'LSTM' in model_text:
+            model_type = 'lstm-crf'
         
         result_text = f"预测的{num_predictions}个{lottery_name}号码：\n"
         # 本次预测的所有号码（红, 蓝），用于自动存档核验
@@ -1208,6 +1220,7 @@ class LotteryPredictorApp(QMainWindow):
                 period_item = self.investment_table.item(row, 2)
                 numbers_item = self.investment_table.item(row, 4)
                 lottery_item = self.investment_table.item(row, 1)
+                multiplier_item = self.investment_table.item(row, 5)
                 if not all([period_item, numbers_item, lottery_item]):
                     continue
                 lottery_name = lottery_item.text()
@@ -1232,8 +1245,24 @@ class LotteryPredictorApp(QMainWindow):
                 # 判断奖级
                 prize_table = SSQ_PRIZE_TABLE if lottery_type == 'ssq' else DLT_PRIZE_TABLE
                 key = (red_hits, blue_hits)
-                prize = prize_table.get(key, "未中奖")
+                multiplier = int(multiplier_item.text()) if multiplier_item else 1
+                prize_entry = prize_table.get(key)
+                if prize_entry is None:
+                    prize = "未中奖"
+                    prize_amount = 0
+                else:
+                    prize = prize_entry[0]
+                    # 奖金：None=浮动奖(按固定估算)，否则用表中金额
+                    if prize_entry[1] is not None:
+                        prize_amount = prize_entry[1] * multiplier
+                    else:
+                        # 一等奖/二等奖浮动，按估算值
+                        prize_amount = (5000000 if "一" in prize else 150000) * multiplier
                 self.investment_table.setItem(row, 7, QTableWidgetItem(prize))
+                # 计算盈亏
+                cost = 2 * multiplier
+                net_profit = prize_amount - cost
+                self.investment_table.setItem(row, 8, QTableWidgetItem(f"{net_profit:.2f}"))
                 verified += 1
             self.update_investment_stats()
             self.log_emitter.new_log.emit(f"已核验 {verified} 条投注记录")
@@ -1280,11 +1309,17 @@ class LotteryPredictorApp(QMainWindow):
             total_count = self.investment_table.rowCount()
             for r in range(total_count):
                 amount_item = self.investment_table.item(r, 6)
+                profit_item = self.investment_table.item(r, 8)
                 prize_item = self.investment_table.item(r, 7)
                 if amount_item:
                     total_invested += float(amount_item.text())
-                if prize_item and prize_item.text() not in ("待开奖", "未中奖", ""):
-                    won_count += 1
+                if profit_item:
+                    profit = float(profit_item.text())
+                    # 盈亏 = 奖金 - 成本，总中奖 = 盈亏 + 成本（即奖金）
+                    if prize_item and prize_item.text() not in ("待开奖", "未中奖", ""):
+                        cost = float(amount_item.text()) if amount_item else 0
+                        total_won += profit + cost
+                        won_count += 1
             net = total_won - total_invested
             roi = (net / total_invested * 100) if total_invested > 0 else 0
             win_rate = (won_count / total_count * 100) if total_count > 0 else 0
@@ -1471,17 +1506,14 @@ class LotteryPredictorApp(QMainWindow):
         lottery_type = lottery_keys[lottery_index]
 
         model_text = self.model_combo.currentText()
+        model_text_clean = model_text.replace(" (默认)", "").replace(" (默认)", "")
         model_type = None
-        # 先检查 lstm-crf
-        for key, value in {'lstm-crf': 'LSTM-CRF (默认)'}.items():
-            if value == model_text:
+        for key, value in MODEL_TYPES.items():
+            if value == model_text or value == model_text_clean:
                 model_type = key
                 break
-        if model_type is None:
-            for key, value in MODEL_TYPES.items():
-                if value == model_text:
-                    model_type = key
-                    break
+        if model_type is None and 'LSTM' in model_text:
+            model_type = 'lstm-crf'
         if model_type is None:
             self.update_log("错误：无法识别模型类型")
             return
