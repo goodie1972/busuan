@@ -56,11 +56,16 @@ def create_main_tab(main_tab):
     model_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     model_combo = QComboBox()
     model_combo.setStyleSheet(spin_style)
-    model_combo.addItem("LSTM-CRF (默认)")
-    from ml_models import MODEL_TYPES
+    from ml_models import MODEL_TYPES, LIGHTGBM_AVAILABLE
+    # Add LightGBM first if available (better performance), otherwise LSTM-CRF
+    if LIGHTGBM_AVAILABLE:
+        model_combo.addItem("LightGBM (默认)")
+    else:
+        model_combo.addItem("LSTM-CRF (默认)")
+    
     for model_key, model_name in MODEL_TYPES.items():
-        if model_key in ('ziwei', 'meihua'):
-            continue  # 紫微斗数/梅花易数有独立标签页，不放入预测模型下拉框
+        if model_key in ('ziwei', 'meihua', 'lightgbm'):
+            continue  # 紫微斗数/梅花易数有独立标签页; LightGBM已添加为默认
         model_combo.addItem(model_name)
     row1.addWidget(lottery_label)
     row1.addWidget(lottery_combo, 1)
