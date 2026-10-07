@@ -201,6 +201,7 @@ class ThemeManager:
             }}
             QLabel {{
                 color: {theme['text']};
+                background-color: {theme['panel']};
             }}
             QComboBox, QSpinBox, QLineEdit {{
                 border: 1px solid {theme['border']};
