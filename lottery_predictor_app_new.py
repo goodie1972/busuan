@@ -287,6 +287,9 @@ class LotteryPredictorApp(QMainWindow):
 
         self.setCentralWidget(self.tab_widget)
         
+        # 加载投注记录
+        self.load_investment_records()
+        
         # 数据更新定时提醒相关
         self.data_check_timer = QTimer()
         self.data_check_thread = None
@@ -1115,7 +1118,7 @@ class LotteryPredictorApp(QMainWindow):
             self.log_emitter.new_log.emit(f"导出失败: {e}")
 
     def delete_selected_prediction_records(self):
-        """删除选中的预测记录"""
+        """删除选中的预测记录（通过匹配内容定位原始记录）"""
         try:
             selected_rows = sorted(set(item.row() for item in self.records_table.selectedItems()), reverse=True)
             if not selected_rows:
@@ -1123,13 +1126,35 @@ class LotteryPredictorApp(QMainWindow):
                 return
             from prediction_records import load_records, save_records
             records = load_records()
-            # 表格是倒序显示的，需要反推
-            total = len(records)
-            indices_to_delete = [total - 1 - row for row in selected_rows]
-            records = [r for i, r in enumerate(records) if i not in indices_to_delete]
+            # 通过匹配表格内容（预测时间+彩票+模型+期号+红球+蓝球）定位原始记录
+            to_delete = set()
+            for row in selected_rows:
+                if row >= self.records_table.rowCount():
+                    continue
+                predict_time = self.records_table.item(row, 1).text() if self.records_table.item(row, 1) else ""
+                lottery_name = self.records_table.item(row, 2).text() if self.records_table.item(row, 2) else ""
+                model = self.records_table.item(row, 3).text() if self.records_table.item(row, 3) else ""
+                period = self.records_table.item(row, 4).text() if self.records_table.item(row, 4) else ""
+                red_str = self.records_table.item(row, 5).text() if self.records_table.item(row, 5) else ""
+                blue_str = self.records_table.item(row, 6).text() if self.records_table.item(row, 6) else ""
+                # 在原始记录中查找匹配
+                for idx, rec in enumerate(records):
+                    if idx in to_delete:
+                        continue
+                    rec_lt = "双色球" if rec.get('lottery_type') == 'ssq' else "大乐透"
+                    rec_red = " ".join(f"{n:02d}" for n in rec.get('red_numbers', []))
+                    rec_blue = " ".join(f"{n:02d}" for n in rec.get('blue_numbers', []))
+                    if (rec.get('predict_time', '')[:19] == predict_time and
+                        rec_lt == lottery_name and
+                        rec.get('model_type', '') == model and
+                        str(rec.get('latest_period', '')) == period and
+                        rec_red == red_str and rec_blue == blue_str):
+                        to_delete.add(idx)
+                        break
+            records = [r for i, r in enumerate(records) if i not in to_delete]
             save_records(records)
             self.refresh_prediction_records()
-            self.log_emitter.new_log.emit(f"已删除 {len(selected_rows)} 条预测记录")
+            self.log_emitter.new_log.emit(f"已删除 {len(to_delete)} 条预测记录")
         except Exception as e:
             self.log_emitter.new_log.emit(f"删除失败: {e}")
 
@@ -1202,6 +1227,7 @@ class LotteryPredictorApp(QMainWindow):
                 QMessageBox.information(self, "提示", "请先勾选要投注的预测记录")
                 return
             self.update_investment_stats()
+            self.save_investment_records()
             self.log_emitter.new_log.emit(f"已添加 {added} 条投注记录，倍数 {multiplier}，投入 {added * cost_per_ticket * multiplier:.2f} 元")
         except Exception as e:
             self.log_emitter.new_log.emit(f"确认投注失败: {e}")
@@ -1213,9 +1239,9 @@ class LotteryPredictorApp(QMainWindow):
             if not selected_rows:
                 QMessageBox.information(self, "提示", "请先选择要核验的投注记录")
                 return
-            from prediction_records import load_records
             from backtest import SSQ_PRIZE_TABLE, DLT_PRIZE_TABLE, _load_csv_data
             verified = 0
+            skipped = 0
             for row in selected_rows:
                 period_item = self.investment_table.item(row, 2)
                 numbers_item = self.investment_table.item(row, 4)
@@ -1234,8 +1260,12 @@ class LotteryPredictorApp(QMainWindow):
                 blue = [int(x) for x in blue_str]
                 # 查找开奖数据
                 df = _load_csv_data(lottery_type)
+                if df is None:
+                    self.log_emitter.new_log.emit(f"无法加载开奖数据: {lottery_type}")
+                    break
                 draw = df[df['期数'] == period]
                 if draw.empty:
+                    skipped += 1
                     continue
                 draw_row = draw.iloc[0]
                 actual_red = [int(draw_row[col]) for col in draw_row.index if '红球' in str(col)]
@@ -1265,7 +1295,11 @@ class LotteryPredictorApp(QMainWindow):
                 self.investment_table.setItem(row, 8, QTableWidgetItem(f"{net_profit:.2f}"))
                 verified += 1
             self.update_investment_stats()
-            self.log_emitter.new_log.emit(f"已核验 {verified} 条投注记录")
+            self.save_investment_records()
+            msg = f"已核验 {verified} 条投注记录"
+            if skipped > 0:
+                msg += f"（{skipped} 条期号未找到，跳过）"
+            self.log_emitter.new_log.emit(msg)
         except Exception as e:
             self.log_emitter.new_log.emit(f"核验投注失败: {e}")
 
@@ -1298,6 +1332,7 @@ class LotteryPredictorApp(QMainWindow):
         if reply == QMessageBox.Yes:
             self.investment_table.setRowCount(0)
             self.update_investment_stats()
+            self.save_investment_records()
             self.log_emitter.new_log.emit("已清空全部投注记录")
 
     def update_investment_stats(self):
@@ -1331,7 +1366,40 @@ class LotteryPredictorApp(QMainWindow):
         except Exception as e:
             self.log_emitter.new_log.emit(f"更新统计失败: {e}")
 
-    
+    def save_investment_records(self):
+        """保存投注记录到JSON文件"""
+        try:
+            records = []
+            for r in range(self.investment_table.rowCount()):
+                record = {}
+                for c in range(self.investment_table.columnCount()):
+                    item = self.investment_table.item(r, c)
+                    record[c] = item.text() if item else ""
+                records.append(record)
+            with open(self.investment_file, 'w', encoding='utf-8') as f:
+                import json
+                json.dump(records, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"保存投注记录失败: {e}")
+
+    def load_investment_records(self):
+        """从JSON文件加载投注记录"""
+        try:
+            if not os.path.exists(self.investment_file):
+                return
+            import json
+            with open(self.investment_file, 'r', encoding='utf-8') as f:
+                records = json.load(f)
+            self.investment_table.setRowCount(0)
+            for record in records:
+                row = self.investment_table.rowCount()
+                self.investment_table.insertRow(row)
+                for c in range(self.investment_table.columnCount()):
+                    self.investment_table.setItem(row, c, QTableWidgetItem(str(record.get(str(c), ""))))
+            self.update_investment_stats()
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"加载投注记录失败: {e}")
+
     def analyze_data(self):
         selected_index = self.lottery_combo.currentIndex()
         selected_key = list(name_path.keys())[selected_index]
