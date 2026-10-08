@@ -10,7 +10,7 @@ import shutil
 import subprocess
 
 # ==================== 配置 ====================
-APP_NAME = "LotteryProphet"
+APP_NAME = "busuan"
 ENTRY_POINT = "main.py"
 ICON_FILE = None  # 如果有 .ico 图标文件，可设置路径
 SINGLE_FILE = False  # True=单个 exe, False=目录模式（更可靠）
