@@ -17,7 +17,7 @@ class ThemeManager:
     """主题管理器类，用于管理和应用自定义主题"""
     
     def __init__(self):
-        self.settings = QSettings("LottoProphet", "LotteryPredictor")
+        self.settings = QSettings("busuan", "LotteryPredictor")
         
         # 预定义主题
         self.themes = {
