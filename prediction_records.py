@@ -39,7 +39,8 @@ def save_records(records):
 
 
 def add_prediction_record(lottery_type, model_type, latest_period,
-                          red_numbers, blue_numbers):
+                          red_numbers, blue_numbers, red_probabilities=None,
+                          blue_probabilities=None):
     """
     保存一条预测记录（失败不抛异常，避免影响预测主流程）
 
@@ -49,6 +50,8 @@ def add_prediction_record(lottery_type, model_type, latest_period,
         latest_period: 预测时已知的最新开奖期数
         red_numbers: 红球号码列表
         blue_numbers: 蓝球号码列表
+        red_probabilities: 红球号码对应的概率列表（可选）
+        blue_probabilities: 蓝球号码对应的概率列表（可选）
 
     Returns:
         int: 存档后的累计记录条数；存档失败返回 None
@@ -61,6 +64,9 @@ def add_prediction_record(lottery_type, model_type, latest_period,
             'latest_period': int(latest_period),
             'red_numbers': [int(x) for x in red_numbers],
             'blue_numbers': [int(x) for x in blue_numbers],
+            # 新增：预测概率（用于后续校准）
+            'red_probabilities': [float(p) for p in red_probabilities] if red_probabilities else None,
+            'blue_probabilities': [float(p) for p in blue_probabilities] if blue_probabilities else None,
             # 核验后填充
             'target_period': None,
             'red_hits': None,

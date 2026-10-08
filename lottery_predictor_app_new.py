@@ -739,7 +739,10 @@ class LotteryPredictorApp(QMainWindow):
                     red_combos = list(itertools.combinations(red_numbers, ml_model.red_count))
                     blue_combos = list(itertools.combinations(blue_numbers, ml_model.blue_count)) if ml_model.blue_count > 0 else [()]
                     predictions_to_save = [ (list(r), list(b)) for r in red_combos for b in blue_combos ]
-                    self._save_prediction_records(lottery_type, model_type, predictions_to_save)
+                    # 获取概率信息用于存档
+                    red_probabilities = getattr(ml_model, 'last_red_proba', None)
+                    blue_probabilities = getattr(ml_model, 'last_blue_proba', None)
+                    self._save_prediction_records(lottery_type, model_type, predictions_to_save, red_probabilities, blue_probabilities)
                     return
 
                 if predict_mode == "胆拖":
@@ -781,12 +784,15 @@ class LotteryPredictorApp(QMainWindow):
                     red_combos = list(itertools.combinations(r_tuo, red_pick)) if red_pick > 0 else [tuple()]
                     blue_combos = list(itertools.combinations(b_tuo, blue_pick)) if blue_pick > 0 else [tuple()]
                     predictions_to_save = []
+                    # 收集概率信息用于存档
+                    red_probabilities = getattr(ml_model, 'last_red_proba', None)
+                    blue_probabilities = getattr(ml_model, 'last_blue_proba', None)
                     for r_combo in red_combos:
                         red_nums = sorted(list(r_dan) + list(r_combo))
                         for b_combo in blue_combos:
                             blue_nums = sorted(list(b_dan) + list(b_combo))
-                            predictions_to_save.append((red_nums, blue_nums))
-                    self._save_prediction_records(lottery_type, model_type, predictions_to_save)
+                            predictions_to_save.append((red_nums, blue_nums, red_probabilities, blue_probabilities))
+                    self._save_prediction_records(lottery_type, model_type, predictions_to_save, red_probabilities, blue_probabilities)
                     return
 
                 for i in range(num_predictions):
@@ -796,14 +802,18 @@ class LotteryPredictorApp(QMainWindow):
                     if red_predictions is None or blue_predictions is None:
                         raise ValueError(f"预测失败，请检查数据或重新训练模型。")
                     
+                    # 收集预测概率信息（用于后续校准）
+                    red_probabilities = getattr(ml_model, 'last_red_proba', None)
+                    blue_probabilities = getattr(ml_model, 'last_blue_proba', None)
+                    
                     if lottery_type == "dlt":
                         result_text += f"  第 {i+1} 组: {' '.join(map(str, red_predictions))} + {' '.join(map(str, blue_predictions))}\n"
                         collected_predictions.append(
-                            (list(red_predictions), list(blue_predictions)))
+                            (list(red_predictions), list(blue_predictions), red_probabilities, blue_probabilities))
                     else:
                         result_text += f"  第 {i+1} 组: {' '.join(map(str, red_predictions))} + {str(blue_predictions[0])}\n"
                         collected_predictions.append(
-                            (list(red_predictions), [int(blue_predictions[0])]))
+                            (list(red_predictions), [int(blue_predictions[0])], red_probabilities, blue_probabilities))
 
             self.result_label.setText(result_text)
             # 自动存档预测记录（供'历史回测'页核验，失败不影响结果）
@@ -820,7 +830,7 @@ class LotteryPredictorApp(QMainWindow):
     def update_log(self, text):
         self.log_box.append(text)
 
-    def _save_prediction_records(self, lottery_type, model_type, predictions):
+    def _save_prediction_records(self, lottery_type, model_type, predictions, red_probabilities=None, blue_probabilities=None):
         """
         将本次生成的预测号码自动存档，供'历史回测'页核验。
         存档失败不影响预测结果展示。
@@ -833,10 +843,23 @@ class LotteryPredictorApp(QMainWindow):
             latest_period = int(df['期数'].max())
             from prediction_records import add_prediction_record
             count = None
-            for red_nums, blue_nums in predictions:
+            for prediction in predictions:
+                # 处理新旧两种格式：(red, blue) 或 (red, blue, red_proba, blue_proba)
+                if len(prediction) == 2:
+                    red_nums, blue_nums = prediction
+                    red_proba = None
+                    blue_proba = None
+                elif len(prediction) == 4:
+                    red_nums, blue_nums, red_proba, blue_proba = prediction
+                else:
+                    # 后备方案，只取前两个元素
+                    red_nums, blue_nums = prediction[0], prediction[1]
+                    red_proba = None
+                    blue_proba = None
+                    
                 count = add_prediction_record(
                     lottery_type, model_type, latest_period,
-                    red_nums, blue_nums)
+                    red_nums, blue_nums, red_proba, blue_proba)
             if count:
                 self.log_emitter.new_log.emit(
                     f"已存档 {len(predictions)} 注预测记录（累计 {count} 注），"

@@ -1450,10 +1450,12 @@ class LotteryMLModels:
         Returns:
             预测的红球和蓝球号码
         """
-        # 每次预测前清空置信度，仅在主预测路径末尾填充
+        # 每次预测前清空置信度和概率，仅在主预测路径末尾填充
         self.last_confidence = None
         self.last_red_conf = None
         self.last_blue_conf = None
+        self.last_red_proba = None
+        self.last_blue_proba = None
         # 检查是否使用期望值模型
         if self.model_type == 'expected_value' and EXPECTED_VALUE_MODEL_AVAILABLE:
             # 检查模型是否已经加载
@@ -1501,6 +1503,16 @@ class LotteryMLModels:
                     if new_num not in blue_numbers:
                         blue_numbers.append(new_num)
                 blue_numbers.sort()
+                
+                # 提取概率信息用于后续校准
+                ev_model = self.models['red']  # 红球和蓝球使用同一个模型实例
+                if hasattr(ev_model, 'red_probabilities') and ev_model.red_probabilities is not None:
+                    # 创建与预测号码对应的概率列表
+                    self.last_red_proba = [ev_model.red_probabilities.get(num, 0.0) for num in red_numbers]
+                    self.last_blue_proba = [ev_model.blue_probabilities.get(num, 0.0) for num in blue_numbers]
+                else:
+                    self.last_red_proba = None
+                    self.last_blue_proba = None
                 
                 return red_numbers, blue_numbers
             self.log("期望值模型预测失败")
@@ -1673,8 +1685,10 @@ class LotteryMLModels:
                 else:
                     proba_map = _class_proba_dict(self.models['red'], X_scaled)
                 self.last_red_conf = _mean_confidence(proba_map, red_predictions)
+                self.last_red_proba = proba_map  # 存储完整概率映射用于校准
             except Exception:
                 self.last_red_conf = None
+                self.last_red_proba = None
             
             # 预测蓝球
             if self.model_type == 'ensemble':
@@ -1738,8 +1752,10 @@ class LotteryMLModels:
                 else:
                     proba_map = _class_proba_dict(self.models['blue'], X_scaled)
                 self.last_blue_conf = _mean_confidence(proba_map, blue_predictions)
+                self.last_blue_proba = proba_map  # 存储完整概率映射用于校准
             except Exception:
                 self.last_blue_conf = None
+                self.last_blue_proba = None
         except Exception as e:
             self.log(f"预测过程中出错: {e}")
             import traceback
@@ -1870,6 +1886,10 @@ class LotteryMLModels:
             if not red_proba or not blue_proba:
                 self.log("模型无概率输出。xgboost(softmax)等模型不支持，请改用 ensemble/gbdt/lightgbm/catboost")
                 return None, None
+
+            # 存储概率映射用于后续校准
+            self.last_red_proba = red_proba
+            self.last_blue_proba = blue_proba
 
             red_ranked = sorted(red_proba.items(), key=lambda x: x[1], reverse=True)
             blue_ranked = sorted(blue_proba.items(), key=lambda x: x[1], reverse=True)
