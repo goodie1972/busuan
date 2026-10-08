@@ -1401,6 +1401,9 @@ class LotteryPredictorApp(QMainWindow):
     def load_investment_records(self):
         """从JSON文件加载投注记录"""
         try:
+            if not hasattr(self, 'investment_file'):
+                self.investment_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                                   'investment_history.json')
             if not os.path.exists(self.investment_file):
                 return
             import json
