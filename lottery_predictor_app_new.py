@@ -301,7 +301,7 @@ class LotteryPredictorApp(QMainWindow):
 
         # 启动数据更新定时提醒（每30分钟检查一次，首次启动后10秒开始）
         self.data_check_timer.timeout.connect(self.start_data_check)
-        self.data_check_timer.start(30 * 60 * 1000)  # 30分钟
+        self.data_check_timer.start(60 * 60 * 1000)  # 1小时
         QTimer.singleShot(10000, self.start_data_check)  # 首次延迟10秒
 
     def _add_copy_print_buttons(self):
@@ -1572,7 +1572,7 @@ class LotteryPredictorApp(QMainWindow):
         """处理数据检查结果"""
         if has_new and message:
             # 状态栏提醒（3秒）
-            self.statusBar().showMessage(message, 3000)
+            self.statusBar().showMessage(message, 60000)  # 1分钟
             # 标题栏追加提醒（不覆盖GPU信息）
             base_title = f"卜算 - 彩票娱乐软件 - GPU: {self.cuda_info}"
             self.setWindowTitle(base_title + " ｜ " + message)
