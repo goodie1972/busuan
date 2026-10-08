@@ -1,4 +1,4 @@
-# LottoProphet — Agent Guide
+# busuan — Agent Guide
 
 ## 项目概览
 

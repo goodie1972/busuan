@@ -1,4 +1,4 @@
-# LottoProphet
+# busuan
 
 A sophisticated machine learning application for lottery number prediction. This project supports two major lottery types: **SSQ (Double Color Ball)** and **DLT (Big Lotto)**, using advanced machine learning and AI techniques to generate predictions based on historical data patterns.
 
@@ -33,8 +33,8 @@ A sophisticated machine learning application for lottery number prediction. This
 
 ### Basic Installation
 ```bash
-git clone https://github.com/zhaoyangpp/LottoProphet.git
-cd LottoProphet
+git clone https://github.com/goodie1972/busuan.git
+cd busuan
 pip install -r requirements.txt
 ```
 
@@ -48,7 +48,7 @@ python setup.py install
 ## Project Structure
 
 ```
-LottoProphet/
+busuan/
 ├── main.py                         # Main entry point, supports command line arguments
 ├── lottery_predictor_app_new.py    # Main application with complete GUI
 ├── ui_components.py                # UI components and layout functions
@@ -169,7 +169,7 @@ The Expected Value Model applies game theory concepts:
 - GPU acceleration for neural network training and inference
 
 ## Contributing
-Contributions to LottoProphet are welcome. Please feel free to submit pull requests or open issues for bugs and feature requests.
+Contributions to busuan are welcome. Please feel free to submit pull requests or open issues for bugs and feature requests.
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details. 
