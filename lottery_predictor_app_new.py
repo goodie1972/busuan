@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import time
 import logging
+import itertools
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton,
     QLabel, QComboBox, QWidget, QTextEdit, QSpinBox, QHBoxLayout,
@@ -728,12 +729,17 @@ class LotteryPredictorApp(QMainWindow):
                         f"蓝球({len(blue_numbers)}选{ml_model.blue_count}): "
                         f"{' '.join(map(str, blue_numbers))}\n"
                         f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
-                        f"（按模型概率从高到低取号；复式结果不写入核验存档）"
+                        f"（按模型概率从高到低取号；已写入所有复式组合至核验存档）"
                     )
                     self.result_label.setText(result_text)
                     self.log_emitter.new_log.emit(
                         f"复式预测完成: 红{len(red_numbers)}选{ml_model.red_count} "
                         f"蓝{len(blue_numbers)}选{ml_model.blue_count}，{n_notes}注/{n_notes * 2}元")
+                    # 生成所有复式组合并存档
+                    red_combos = list(itertools.combinations(red_numbers, ml_model.red_count))
+                    blue_combos = list(itertools.combinations(blue_numbers, ml_model.blue_count)) if ml_model.blue_count > 0 else [()]
+                    predictions_to_save = [ (list(r), list(b)) for r in red_combos for b in blue_combos ]
+                    self._save_prediction_records(lottery_type, model_type, predictions_to_save)
                     return
 
                 if predict_mode == "胆拖":
@@ -765,12 +771,22 @@ class LotteryPredictorApp(QMainWindow):
                         f"最新期: {int(df['期数'].max())}\n"
                         f"{dan_label}"
                         f"共 {n_notes} 注，投注金额 {n_notes * 2} 元\n"
-                        f"（胆码固定，拖码按模型概率排序；胆拖结果不写入核验存档）"
+                        f"（胆码固定，拖码按模型概率排序；已写入所有胆拖组合至核验存档）"
                     )
                     self.result_label.setText(result_text)
                     self.log_emitter.new_log.emit(
                         f"胆拖预测完成: 红胆{len(r_dan)}+红拖{len(r_tuo)} "
                         f"蓝胆{len(b_dan)}+蓝拖{len(b_tuo)}，{n_notes}注/{n_notes * 2}元")
+                    # 生成所有胆拖组合并存档
+                    red_combos = list(itertools.combinations(r_tuo, red_pick)) if red_pick > 0 else [tuple()]
+                    blue_combos = list(itertools.combinations(b_tuo, blue_pick)) if blue_pick > 0 else [tuple()]
+                    predictions_to_save = []
+                    for r_combo in red_combos:
+                        red_nums = sorted(list(r_dan) + list(r_combo))
+                        for b_combo in blue_combos:
+                            blue_nums = sorted(list(b_dan) + list(b_combo))
+                            predictions_to_save.append((red_nums, blue_nums))
+                    self._save_prediction_records(lottery_type, model_type, predictions_to_save)
                     return
 
                 for i in range(num_predictions):
