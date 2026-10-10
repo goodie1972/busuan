@@ -583,7 +583,26 @@ class CalibrationThread(QThread):
             self.log_signal.emit(f"红球样本: {red_count}, 蓝球样本: {blue_count}")
 
             if red_count == 0 and blue_count == 0:
-                self.log_signal.emit("没有可用的校准数据（需要先核验预测记录）")
+                # 给出精确诊断，避免"请先核验"这类误导性提示
+                from prediction_records import load_records
+                all_records = load_records()
+                lt_records = [r for r in all_records
+                              if r.get('lottery_type') in (None, self.lottery_type)]
+                verified = [r for r in lt_records if r.get('target_period') is not None]
+                with_proba = [r for r in verified if r.get('red_probabilities')
+                              or r.get('blue_probabilities')]
+                if not lt_records:
+                    self.log_signal.emit("没有可用的校准数据：该彩种暂无任何预测记录")
+                elif not verified:
+                    self.log_signal.emit("没有可用的校准数据：已有预测记录但都未核验，"
+                                         "请先在'历史回测'页核验")
+                elif not with_proba:
+                    self.log_signal.emit("没有可用的校准数据：已核验的记录都不含模型概率"
+                                         "（概率存档功能启用前的旧记录无法补充概率）")
+                    self.log_signal.emit("解决：从下次起正常生成预测+核验即可自动积累，"
+                                         "建议积累30注以上再训练校准模型")
+                else:
+                    self.log_signal.emit("没有可用的校准数据：已核验记录的概率数据不完整")
                 self.finished_signal.emit(False)
                 return
 

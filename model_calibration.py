@@ -70,6 +70,9 @@ def collect_calibration_data(lottery_type: str) -> Tuple[Dict[int, List[float]],
     blue_data = {}  # {号码: [概率列表]}
     
     for record in records:
+        # 只统计对应彩种的记录（两彩种期号可能重复，混入会污染校准样本）
+        if record.get('lottery_type') and record.get('lottery_type') != lottery_type:
+            continue
         # 跳过未核验的记录
         if record.get('target_period') is None:
             continue
