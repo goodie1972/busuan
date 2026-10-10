@@ -31,3 +31,6 @@ backtest/*.json
 .swarm/summaries/
 .swarm/telemetry.jsonl
 prediction_history.json
+
+# 模型优化运行时产物（特征分析/漂移检测结果，可再生成，不入库）
+feature_analysis/

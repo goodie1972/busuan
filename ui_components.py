@@ -1639,3 +1639,175 @@ def create_investment_plan_tab_new(investment_tab):
             total_invested_label, total_won_label, net_profit_label,
             roi_label, win_rate_label)
 
+
+def create_optimization_tab(optimization_tab):
+    """
+    创建模型优化标签页：包含模型校准、特征分析、反馈重训练三大子模块
+
+    Returns:
+        tuple: 关键UI组件
+    """
+    layout = QVBoxLayout(optimization_tab)
+    layout.setSpacing(6)
+    layout.setContentsMargins(8, 8, 8, 8)
+
+    label_style = "font-size: 11pt;"
+    spin_style = "font-size: 11pt; min-height: 26px;"
+    card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { padding-left: 10px; }"
+    btn_style = "font-size: 11pt; min-height: 30px; padding: 4px 12px;"
+
+    # ==================== 顶部：彩票类型选择 ====================
+    top_row = QHBoxLayout()
+    top_row.addWidget(QLabel("彩票类型:"))
+    lottery_combo = QComboBox()
+    lottery_combo.addItems(["双色球 (SSQ)", "大乐透 (DLT)"])
+    lottery_combo.setStyleSheet(spin_style)
+    top_row.addWidget(lottery_combo)
+    top_row.addStretch()
+    layout.addLayout(top_row)
+
+    # ==================== 1. 模型校准区 ====================
+    calibration_group = QGroupBox("📊 模型校准 (概率校准)")
+    calib_layout = QVBoxLayout(calibration_group)
+
+    calib_info_row = QHBoxLayout()
+    calib_status_label = QLabel("校准状态: 未校准")
+    calib_status_label.setStyleSheet(label_style + " font-weight: bold; color: #F44336;")
+    calib_samples_label = QLabel("校准样本: 0")
+    calib_samples_label.setStyleSheet(label_style)
+    calib_update_label = QLabel("更新时间: -")
+    calib_update_label.setStyleSheet(label_style)
+    for lbl in [calib_status_label, calib_samples_label, calib_update_label]:
+        calib_info_row.addWidget(lbl)
+    calib_info_row.addStretch()
+    calib_layout.addLayout(calib_info_row)
+
+    calib_btn_row = QHBoxLayout()
+    refresh_calib_btn = QPushButton("刷新校准状态")
+    refresh_calib_btn.setStyleSheet(btn_style)
+    calib_btn_row.addWidget(refresh_calib_btn)
+    train_calib_btn = QPushButton("训练校准模型")
+    train_calib_btn.setStyleSheet(btn_style + " background-color: #2B579A; color: white; font-weight: bold;")
+    calib_btn_row.addWidget(train_calib_btn)
+    show_calib_btn = QPushButton("查看校准曲线")
+    show_calib_btn.setStyleSheet(btn_style)
+    calib_btn_row.addWidget(show_calib_btn)
+    calib_btn_row.addStretch()
+    calib_layout.addLayout(calib_btn_row)
+
+    # 校准结果表格
+    calib_table = QTableWidget()
+    calib_table.setColumnCount(5)
+    calib_table.setHorizontalHeaderLabels(["球类型", "校准状态", "样本数", "校准误差", "最后更新"])
+    calib_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    calib_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    calib_table.setMaximumHeight(100)
+    calib_layout.addWidget(calib_table)
+
+    calibration_group.setStyleSheet(card_style)
+    layout.addWidget(calibration_group)
+
+    # ==================== 2. 特征分析区 ====================
+    feature_group = QGroupBox("🔍 特征分析 (特征重要性与漂移检测)")
+    feat_layout = QVBoxLayout(feature_group)
+
+    feat_config_row = QHBoxLayout()
+    feat_config_row.addWidget(QLabel("Top特征数:"))
+    top_k_spin = QSpinBox()
+    top_k_spin.setRange(5, 50)
+    top_k_spin.setValue(20)
+    top_k_spin.setStyleSheet(spin_style)
+    feat_config_row.addWidget(top_k_spin)
+    feat_config_row.addSpacing(20)
+    feat_config_row.addWidget(QLabel("漂移窗口:"))
+    drift_window_spin = QSpinBox()
+    drift_window_spin.setRange(10, 100)
+    drift_window_spin.setValue(30)
+    drift_window_spin.setStyleSheet(spin_style)
+    feat_config_row.addWidget(drift_window_spin)
+    feat_config_row.addStretch()
+    feat_layout.addLayout(feat_config_row)
+
+    feat_btn_row = QHBoxLayout()
+    run_feat_btn = QPushButton("运行特征分析")
+    run_feat_btn.setStyleSheet(btn_style + " background-color: #2E7D32; color: white; font-weight: bold;")
+    feat_btn_row.addWidget(run_feat_btn)
+    refresh_feat_btn = QPushButton("刷新特征列表")
+    refresh_feat_btn.setStyleSheet(btn_style)
+    feat_btn_row.addWidget(refresh_feat_btn)
+    drift_check_btn = QPushButton("检测特征漂移")
+    drift_check_btn.setStyleSheet(btn_style)
+    feat_btn_row.addWidget(drift_check_btn)
+    feat_btn_row.addStretch()
+    feat_layout.addLayout(feat_btn_row)
+
+    # 特征重要性表格
+    feat_table = QTableWidget()
+    feat_table.setColumnCount(4)
+    feat_table.setHorizontalHeaderLabels(["排名", "特征名称", "重要性得分", "类别"])
+    feat_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    feat_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    feat_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    feat_table.setMinimumHeight(150)
+    feat_layout.addWidget(feat_table)
+
+    feature_group.setStyleSheet(card_style)
+    layout.addWidget(feature_group)
+
+    # ==================== 3. 反馈重训练区 ====================
+    retrain_group = QGroupBox("🔄 反馈重训练 (综合优化)")
+    retrain_layout = QVBoxLayout(retrain_group)
+
+    retrain_info_row = QHBoxLayout()
+    retrain_status_label = QLabel("上次重训练: 未进行")
+    retrain_status_label.setStyleSheet(label_style + " font-weight: bold;")
+    retrain_info_row.addWidget(retrain_status_label)
+    retrain_info_row.addStretch()
+    retrain_layout.addLayout(retrain_info_row)
+
+    retrain_config_row = QHBoxLayout()
+    retrain_config_row.addWidget(QLabel("使用GPU:"))
+    use_gpu_check = QCheckBox("启用GPU训练")
+    retrain_config_row.addWidget(use_gpu_check)
+    retrain_config_row.addSpacing(20)
+    retrain_config_row.addWidget(QLabel("模型选择:"))
+    model_multi_edit = QLineEdit()
+    model_multi_edit.setPlaceholderText("random_forest,xgboost,gbdt,lightgbm,catboost,ensemble (留空=全部)")
+    model_multi_edit.setStyleSheet(spin_style)
+    retrain_config_row.addWidget(model_multi_edit, 1)
+    retrain_layout.addLayout(retrain_config_row)
+
+    retrain_btn_row = QHBoxLayout()
+    retrain_one_btn = QPushButton("重训练当前彩票")
+    retrain_one_btn.setStyleSheet(btn_style + " background-color: #FF9800; color: white; font-weight: bold;")
+    retrain_btn_row.addWidget(retrain_one_btn)
+    retrain_all_btn = QPushButton("重训练全部彩票")
+    retrain_all_btn.setStyleSheet(btn_style + " background-color: #F44336; color: white; font-weight: bold;")
+    retrain_btn_row.addWidget(retrain_all_btn)
+    retrain_btn_row.addStretch()
+    retrain_layout.addLayout(retrain_btn_row)
+
+    retrain_group.setStyleSheet(card_style)
+    layout.addWidget(retrain_group)
+
+    # ==================== 4. 底部：操作日志 ====================
+    log_group = QGroupBox("📋 操作日志")
+    log_layout = QVBoxLayout(log_group)
+    opt_log_box = QTextEdit()
+    opt_log_box.setReadOnly(True)
+    opt_log_box.setStyleSheet("font-size: 10pt; font-family: Consolas, monospace;")
+    opt_log_box.setMinimumHeight(100)
+    log_layout.addWidget(opt_log_box)
+    retrain_group.setStyleSheet(card_style)
+    layout.addWidget(log_group)
+
+    return (lottery_combo,
+            refresh_calib_btn, train_calib_btn, show_calib_btn,
+            calib_status_label, calib_samples_label, calib_update_label,
+            calib_table,
+            top_k_spin, drift_window_spin,
+            run_feat_btn, refresh_feat_btn, drift_check_btn, feat_table,
+            use_gpu_check, model_multi_edit,
+            retrain_one_btn, retrain_all_btn, retrain_status_label,
+            opt_log_box)
+

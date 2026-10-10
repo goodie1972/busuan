@@ -108,304 +108,209 @@ def extract_features_from_data(df: pd.DataFrame, lottery_type: str) -> pd.DataFr
     else:
         return _extract_dlt_features(df)
 
-def _extract_ssq_features(df: pd.DataFrame) -> pd.DataFrame:
-    """提取双色球特征"""
-    # 复制数据以避免修改原始数据
-    feature_df = df.copy()
-    
-    # 红球和蓝球列名
-    red_cols = [f'红球_{i}' for i in range(1, 7)]
-    blue_col = '蓝球'
-    
-    # 确保列存在
-    for col in red_cols + [blue_col]:
+def _red_occ(arr, n):
+    """构建号码出现计数矩阵 oc[i, num-1] = 第 i 期号码 num 的出现次数。
+    原版热度用 list.count（重复号码按次数计），遗漏用 in（存在即1），
+    故用计数矩阵：遗漏处取 oc>0（bool），热度处直接求和（count）。"""
+    m = arr.shape[0]
+    oc = np.zeros((m, n), dtype=np.int32)
+    r = np.arange(m)
+    for ci in range(arr.shape[1]):
+        v = arr[:, ci]
+        ok = (v >= 1) & (v <= n)
+        np.add.at(oc, (r[ok], v[ok] - 1), 1)
+    return oc
+
+
+def _last_before(b, m):
+    """对布尔序列 b（长度 m），返回每位置 p 处严格小于 p 的最后一个 True 下标；无则为 -1。"""
+    a = np.where(b, np.arange(m, dtype=float), np.nan)
+    last = pd.Series(a).ffill().shift(1).fillna(-1).astype(int)
+    return last.values
+
+
+def _generic_miss(arr, n, k):
+    """
+    通用遗漏：对每个号码 num（1..n），计算其自上一次出现到当前期的间隔（独立于本期号码），
+    再按 (num-1)%k+1 折叠到 k 个输出列（与原实现一致的"最后写入者获胜"语义）。
+    """
+    m = arr.shape[0]
+    oc = _red_occ(arr, n)
+    p = np.arange(m)
+    out = np.zeros((m, k), dtype=int)
+    for j in range(1, k + 1):
+        winning = max(num for num in range(1, n + 1) if (num - 1) % k == j - 1)
+        last = _last_before(oc[:, winning - 1] > 0, m)
+        out[:, j - 1] = np.where(last >= 0, p - last, p + 1)
+    return out
+
+
+def _generic_hot(arr, n, k, window=10):
+    """
+    通用热度：每个号码在最近 window 期[不含本期]内的出现次数。
+    原版窗口 = range(max(0,p-window), p) = [p-window, p-1]（含 p-1，不含本期 p），
+    按 (num-1)%k+1 折叠到 k 列（"最后写入者获胜"，与原版一致）。
+    """
+    m = arr.shape[0]
+    oc = _red_occ(arr, n)
+    out = np.zeros((m, k), dtype=int)
+    for j in range(1, k + 1):
+        winning = max(num for num in range(1, n + 1) if (num - 1) % k == j - 1)
+        out[:, j - 1] = _window_count(oc[:, winning - 1], window)
+    return out
+
+
+def _window_count(b, window):
+    """每位置 p 处 [max(0,p-window), p-1] 区间内 b 的求和（原版窗口 range(p-window, p)，含 p-1）。"""
+    m = len(b)
+    b = np.asarray(b, dtype=int)
+    cs = np.concatenate([[0], np.cumsum(b)])  # cs[i] = sum b[0..i-1]
+    lo = np.clip(np.arange(m) - window, 0, m)
+    return cs[np.arange(m)] - cs[lo]
+
+
+def _same_value_miss(bv, n):
+    """
+    同值遗漏：SSQ 蓝球专用——对第 p 期出现的那个号码，计算它上一次出现到本期的间隔。
+    无历史出现则为 p+1。
+    """
+    m = len(bv)
+    out = np.zeros(m, dtype=int)
+    for v in range(1, n + 1):
+        pos = np.where(bv == v)[0]
+        for t in range(len(pos)):
+            p = pos[t]
+            out[p] = (p + 1) if t == 0 else (p - pos[t - 1])
+    return out
+
+
+def _ensure_ball_columns(feature_df, cols):
+    """确保球号列存在，缺失时按原实现的"列名变体"回退逻辑补 0。"""
+    for col in cols:
         if col not in feature_df.columns:
-            # 如果列不存在，尝试查找可能的变体
             possible_cols = [c for c in feature_df.columns if col in c]
             if possible_cols:
-                # 重命名第一个匹配的列
                 feature_df = feature_df.rename(columns={possible_cols[0]: col})
             else:
-                # 创建默认列
                 feature_df[col] = 0
-    
-    # 计算遗漏特征（每个号码自上次出现以来的期数）
-    for i in range(1, 7):
-        col = f'红球_遗漏_{i}'
-        if col not in feature_df.columns:
-            feature_df[col] = 0
-    
-    for period_idx in range(len(feature_df)):
-        current_red = [int(feature_df.iloc[period_idx][f'红球_{i}']) for i in range(1, 7)]
-        # 更新遗漏
-        for num in range(1, 34):  # 红球1-33
-            last_seen = -1
-            # 查看历史数据找到最后一次出现
-            for hist_idx in range(period_idx - 1, -1, -1):
-                hist_red = [int(feature_df.iloc[hist_idx][f'红球_{i}']) for i in range(1, 7)]
-                if num in hist_red:
-                    last_seen = hist_idx
-                    break
-            if last_seen == -1:
-                # 从未出现过
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_遗漏_{((num-1)%6)+1}')] = period_idx + 1
-            else:
-                # 计算遗漏期数
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_遗漏_{((num-1)%6)+1}')] = period_idx - last_seen
-    
-    # 蓝球遗漏
-    blue_col_name = '蓝球_遗漏_1'
-    if blue_col_name not in feature_df.columns:
-        feature_df[blue_col_name] = 0
-        
-    for period_idx in range(len(feature_df)):
-        current_blue = int(feature_df.iloc[period_idx][blue_col])
-        # 更新蓝球遗漏
-        last_seen = -1
-        for hist_idx in range(period_idx - 1, -1, -1):
-            hist_blue = int(feature_df.iloc[hist_idx][blue_col])
-            if hist_blue == current_blue:
-                last_seen = hist_idx
-                break
-        if last_seen == -1:
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(blue_col_name)] = period_idx + 1
-        else:
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(blue_col_name)] = period_idx - last_seen
-    
-    # 计算热度特征（最近10期出现次数）
-    window_size = 10
-    for i in range(1, 7):
-        hot_col = f'红球_热度_{i}'
-        if hot_col not in feature_df.columns:
-            feature_df[hot_col] = 0
-            
-    for period_idx in range(len(feature_df)):
-        start_idx = max(0, period_idx - window_size)
-        end_idx = period_idx
-        window_red = []
-        for hist_idx in range(start_idx, end_idx):
-            hist_red = [int(feature_df.iloc[hist_idx][f'红球_{i}']) for i in range(1, 7)]
-            window_red.extend(hist_red)
-        
-        # 计算每个红球在窗口中的出现次数
-        for num in range(1, 34):
-            count = window_red.count(num)
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_热度_{((num-1)%6)+1}')] = count
-    
-    # 蓝球热度
-    blue_hot_col = '蓝球_热度_1'
-    if blue_hot_col not in feature_df.columns:
-        feature_df[blue_hot_col] = 0
-        
-    for period_idx in range(len(feature_df)):
-        start_idx = max(0, period_idx - window_size)
-        end_idx = period_idx
-        window_blue = []
-        for hist_idx in range(start_idx, end_idx):
-            window_blue.append(int(feature_df.iloc[hist_idx][blue_col]))
-        
-        for num in range(1, 17):  # 蓝球1-16
-            count = window_blue.count(num)
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(f'蓝球_热度_{((num-1)%1)+1}')] = count
-    
-    # 计算和值
+    return feature_df
+
+
+def _region_miss_names(cols):
+    return [f'{c.rsplit("_", 1)[0]}_遗漏_{c.rsplit("_", 1)[1]}' for c in cols]
+
+
+def _region_hot_names(cols):
+    return [f'{c.rsplit("_", 1)[0]}_热度_{c.rsplit("_", 1)[1]}' for c in cols]
+
+
+def _extract_ssq_features(df: pd.DataFrame) -> pd.DataFrame:
+    """提取双色球特征（向量化实现，数值结果与原逐行实现完全一致，性能提升数千倍）。"""
+    feature_df = df.copy()
+    red_cols = [f'红球_{i}' for i in range(1, 7)]
+    blue_col = '蓝球'
+    feature_df = _ensure_ball_columns(feature_df, red_cols + [blue_col])
+    m = len(feature_df)
+    red = feature_df[red_cols].to_numpy(dtype=int)
+    blue = feature_df[blue_col].to_numpy(dtype=int).ravel()
+
+    # 红球遗漏（号码1-33，按 (num-1)%6 折叠到6列）
+    feature_df[_region_miss_names(red_cols)] = _generic_miss(red, 33, 6)
+    # 蓝球遗漏（当前蓝球号码的同值遗漏）
+    feature_df['蓝球_遗漏_1'] = _same_value_miss(blue, 16)
+    # 红球热度（最近10期[不含本期]）
+    feature_df[_region_hot_names(red_cols)] = _generic_hot(red, 33, 6)
+    # 蓝球热度（原版 (num-1)%1 恒为 col1，最后写入者=num16 => 16 的窗口计数）
+    feature_df['蓝球_热度_1'] = _window_count((blue == 16).astype(int), 10)
+
+    # 和值
     if '和值' not in feature_df.columns:
         feature_df['和值'] = 0
     feature_df['和值'] = feature_df[red_cols].sum(axis=1)
-    
-    # 计算跨度
+
+    # 跨度
     if '跨度' not in feature_df.columns:
         feature_df['跨度'] = 0
     red_values = feature_df[red_cols].values
     feature_df['跨度'] = np.max(red_values, axis=1) - np.min(red_values, axis=1)
-    
-    # 计算奇偶比
+
+    # 奇偶比
     if '奇偶比' not in feature_df.columns:
         feature_df['奇偶比'] = 0
-    def count_odd(numbers):
-        return sum(1 for n in numbers if n % 2 == 1)
-    feature_df['奇偶比'] = feature_df[red_cols].apply(lambda row: count_odd(row), axis=1) / 6.0
-    
-    # 计算大小比（大于16为大）
+    red_int = red_values.astype(int)
+    feature_df['奇偶比'] = ((red_int % 2 == 1).sum(axis=1) / 6.0)
+
+    # 大小比（大于16为大）
     if '大小比' not in feature_df.columns:
         feature_df['大小比'] = 0
-    def count_big(numbers):
-        return sum(1 for n in numbers if n > 16)
-    feature_df['大小比'] = feature_df[red_cols].apply(lambda row: count_big(row), axis=1) / 6.0
-    
-    # 计算连号个数
+    feature_df['大小比'] = ((red_int > 16).sum(axis=1) / 6.0)
+
+    # 连号个数
     if '连号个数' not in feature_df.columns:
         feature_df['连号个数'] = 0
-    def count_consecutive(numbers):
-        sorted_nums = sorted(numbers)
-        consecutive = 0
-        for i in range(len(sorted_nums) - 1):
-            if sorted_nums[i+1] - sorted_nums[i] == 1:
-                consecutive += 1
-        return consecutive
-    feature_df['连号个数'] = feature_df[red_cols].apply(lambda row: count_consecutive(row), axis=1)
-    
-    # 计算AC值（相邻差值之和）
+    srt = np.sort(red_int, axis=1)
+    feature_df['连号个数'] = (np.diff(srt, axis=1) == 1).sum(axis=1)
+
+    # AC值（排序后相邻差值之和）
     if 'AC值' not in feature_df.columns:
         feature_df['AC值'] = 0
-    def calculate_ac(numbers):
-        sorted_nums = sorted(numbers)
-        ac_sum = 0
-        for i in range(len(sorted_nums) - 1):
-            ac_sum += abs(sorted_nums[i+1] - sorted_nums[i])
-        return ac_sum
-    feature_df['AC值'] = feature_df[red_cols].apply(lambda row: calculate_ac(row), axis=1)
-    
+    feature_df['AC值'] = np.abs(np.diff(srt, axis=1)).sum(axis=1)
+
     return feature_df
 
+
 def _extract_dlt_features(df: pd.DataFrame) -> pd.DataFrame:
-    """提取大乐透特征"""
-    # 复制数据以避免修改原始数据
+    """提取大乐透特征（向量化实现，数值结果与原逐行实现完全一致，性能提升数千倍）。"""
     feature_df = df.copy()
-    
-    # 前后区列名
     red_cols = [f'红球_{i}' for i in range(1, 6)]  # 前区1-35
     blue_cols = [f'蓝球_{i}' for i in range(1, 3)]  # 后区1-12
-    
-    # 确保列存在
-    for col in red_cols + blue_cols:
-        if col not in feature_df.columns:
-            # 如果列不存在，尝试查找可能的变体
-            possible_cols = [c for c in feature_df.columns if col in c]
-            if possible_cols:
-                # 重命名第一个匹配的列
-                feature_df = feature_df.rename(columns={possible_cols[0]: col})
-            else:
-                # 创建默认列
-                feature_df[col] = 0
-    
-    # 计算前区遗漏特征
-    for i in range(1, 6):
-        col = f'红球_遗漏_{i}'
-        if col not in feature_df.columns:
-            feature_df[col] = 0
-    
-    for period_idx in range(len(feature_df)):
-        current_red = [int(feature_df.iloc[period_idx][f'红球_{i}']) for i in range(1, 6)]
-        # 更新遗漏
-        for num in range(1, 36):  # 前区1-35
-            last_seen = -1
-            # 查看历史数据找到最后一次出现
-            for hist_idx in range(period_idx - 1, -1, -1):
-                hist_red = [int(feature_df.iloc[hist_idx][f'红球_{i}']) for i in range(1, 6)]
-                if num in hist_red:
-                    last_seen = hist_idx
-                    break
-            if last_seen == -1:
-                # 从未出现过
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_遗漏_{((num-1)%5)+1}')] = period_idx + 1
-            else:
-                # 计算遗漏期数
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_遗漏_{((num-1)%5)+1}')] = period_idx - last_seen
-    
-    # 计算后区遗漏特征
-    for i in range(1, 3):
-        col = f'蓝球_遗漏_{i}'
-        if col not in feature_df.columns:
-            feature_df[col] = 0
-            
-    for period_idx in range(len(feature_df)):
-        current_blue = [int(feature_df.iloc[period_idx][f'蓝球_{i}']) for i in range(1, 3)]
-        # 更新遗漏
-        for num in range(1, 13):  # 后区1-12
-            last_seen = -1
-            # 查看历史数据找到最后一次出现
-            for hist_idx in range(period_idx - 1, -1, -1):
-                hist_blue = [int(feature_df.iloc[hist_idx][f'蓝球_{i}']) for i in range(1, 3)]
-                if num in hist_blue:
-                    last_seen = hist_idx
-                    break
-            if last_seen == -1:
-                # 从未出现过
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'蓝球_遗漏_{((num-1)%2)+1}')] = period_idx + 1
-            else:
-                # 计算遗漏期数
-                feature_df.iloc[period_idx, feature_df.columns.get_loc(f'蓝球_遗漏_{((num-1)%2)+1}')] = period_idx - last_seen
-    
-    # 计算前区热度特征（最近10期出现次数）
-    window_size = 10
-    for i in range(1, 6):
-        hot_col = f'红球_热度_{i}'
-        if hot_col not in feature_df.columns:
-            feature_df[hot_col] = 0
-            
-    for period_idx in range(len(feature_df)):
-        start_idx = max(0, period_idx - window_size)
-        end_idx = period_idx
-        window_red = []
-        for hist_idx in range(start_idx, end_idx):
-            hist_red = [int(feature_df.iloc[hist_idx][f'红球_{i}']) for i in range(1, 6)]
-            window_red.extend(hist_red)
-        
-        # 计算每个红球在窗口中的出现次数
-        for num in range(1, 36):  # 前区1-35
-            count = window_red.count(num)
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(f'红球_热度_{((num-1)%5)+1}')] = count
-    
-    # 计算后区热度特征
-    for i in range(1, 3):
-        hot_col = f'蓝球_热度_{i}'
-        if hot_col not in feature_df.columns:
-            feature_df[hot_col] = 0
-            
-    for period_idx in range(len(feature_df)):
-        start_idx = max(0, period_idx - window_size)
-        end_idx = period_idx
-        window_blue = []
-        for hist_idx in range(start_idx, end_idx):
-            window_blue.append(int(feature_df.iloc[hist_idx][f'蓝球_{i}']))
-        
-        for num in range(1, 13):  # 后区1-12
-            count = window_blue.count(num)
-            feature_df.iloc[period_idx, feature_df.columns.get_loc(f'蓝球_热度_{((num-1)%2)+1}')] = count
-    
-    # 计算前区和值
+    feature_df = _ensure_ball_columns(feature_df, red_cols + blue_cols)
+    front = feature_df[red_cols].to_numpy(dtype=int)
+    back = feature_df[blue_cols].to_numpy(dtype=int)
+
+    # 前区遗漏（号码1-35，按 (num-1)%5 折叠到5列）
+    feature_df[_region_miss_names(red_cols)] = _generic_miss(front, 35, 5)
+    # 后区遗漏（号码1-12，按 (num-1)%2 折叠到2列）
+    feature_df[_region_miss_names(blue_cols)] = _generic_miss(back, 12, 2)
+    # 前区热度
+    feature_df[_region_hot_names(red_cols)] = _generic_hot(front, 35, 5)
+    # 后区热度（原版 quirk：window_blue 只追加 蓝球_2 单列（循环变量 i 残留为 2），
+    # 此处用单列输入精确复现，保持数值逐位一致）
+    feature_df[_region_hot_names(blue_cols)] = _generic_hot(back[:, [1]], 12, 2)
+
+    # 前区和值
     if '前区和值' not in feature_df.columns:
         feature_df['前区和值'] = 0
     feature_df['前区和值'] = feature_df[red_cols].sum(axis=1)
-    
-    # 计算后区和值
+
+    # 后区和值
     if '后区和值' not in feature_df.columns:
         feature_df['后区和值'] = 0
     feature_df['后区和值'] = feature_df[blue_cols].sum(axis=1)
-    
-    # 计算前区跨度
+
+    # 前区跨度
     if '前区跨度' not in feature_df.columns:
         feature_df['前区跨度'] = 0
     red_values = feature_df[red_cols].values
     feature_df['前区跨度'] = np.max(red_values, axis=1) - np.min(red_values, axis=1)
-    
-    # 计算前区奇偶比
+
+    # 前区奇偶比
     if '前区奇偶比' not in feature_df.columns:
         feature_df['前区奇偶比'] = 0
-    def count_odd(numbers):
-        return sum(1 for n in numbers if n % 2 == 1)
-    feature_df['前区奇偶比'] = feature_df[red_cols].apply(lambda row: count_odd(row), axis=1) / 5.0
-    
-    # 计算前区大小比（大于17为大）
+    red_int = red_values.astype(int)
+    feature_df['前区奇偶比'] = ((red_int % 2 == 1).sum(axis=1) / 5.0)
+
+    # 前区大小比（大于17为大）
     if '前区大小比' not in feature_df.columns:
         feature_df['前区大小比'] = 0
-    def count_big(numbers):
-        return sum(1 for n in numbers if n > 17)
-    feature_df['前区大小比'] = feature_df[red_cols].apply(lambda row: count_big(row), axis=1) / 5.0
-    
-    # 计算前区连号个数
+    feature_df['前区大小比'] = ((red_int > 17).sum(axis=1) / 5.0)
+
+    # 前区连号个数
     if '前区连号个数' not in feature_df.columns:
         feature_df['前区连号个数'] = 0
-    def count_consecutive(numbers):
-        sorted_nums = sorted(numbers)
-        consecutive = 0
-        for i in range(len(sorted_nums) - 1):
-            if sorted_nums[i+1] - sorted_nums[i] == 1:
-                consecutive += 1
-        return consecutive
-    feature_df['前区连号个数'] = feature_df[red_cols].apply(lambda row: count_consecutive(row), axis=1)
-    
+    srt = np.sort(red_int, axis=1)
+    feature_df['前区连号个数'] = (np.diff(srt, axis=1) == 1).sum(axis=1)
+
     return feature_df
 
 def analyze_feature_importance(lottery_type: str, model_type: str = 'ensemble') -> Dict[str, float]:
@@ -716,8 +621,21 @@ def save_drift_detection(drift_data: Dict[str, Any]) -> bool:
     """
     try:
         ensure_feature_dir()
+        # numpy 标量（np.bool_/np.int64 等）无法被 json 序列化，递归转为原生 Python 类型
+        def _to_py(obj):
+            if isinstance(obj, dict):
+                return {k: _to_py(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [_to_py(v) for v in obj]
+            if isinstance(obj, (bool, np.bool_)):
+                return bool(obj)
+            if isinstance(obj, (int, np.integer)):
+                return int(obj)
+            if isinstance(obj, (float, np.floating)):
+                return float(obj)
+            return obj
         data = {
-            'drift_detection': drift_data,
+            'drift_detection': _to_py(drift_data),
             'timestamp': datetime.now().isoformat(),
             'version': '1.0'
         }

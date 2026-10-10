@@ -32,7 +32,8 @@ from ml_models import (
 )
 from thread_utils import (
     TrainModelThread, UpdateDataThread, LogEmitter, BacktestThread,
-    AutoPredictThread, DataCheckThread
+    AutoPredictThread, DataCheckThread,
+    CalibrationThread, FeatureAnalysisThread, RetrainThread
 )
 from prediction_utils import (
     process_predictions, randomize_numbers
@@ -43,7 +44,8 @@ from ui_components import (
     create_expected_value_tab, create_backtest_tab,
     create_ziwei_tab, create_meihua_tab,
     create_prediction_records_tab,
-    create_investment_plan_tab_new
+    create_investment_plan_tab_new,
+    create_optimization_tab
 )
 from data_processing import (
     process_analysis_data, get_trend_features, prepare_recent_trend_data,
@@ -267,6 +269,41 @@ class LotteryPredictorApp(QMainWindow):
         self.invest_export_btn.clicked.connect(self.export_investment_records)
         self.invest_clear_btn.clicked.connect(self.clear_investment_records)
         self.tab_widget.addTab(self.investment_tab, "投注计划")
+
+        # ===== 模型优化标签页 =====
+        self.optimization_tab = QWidget()
+        (self.opt_lottery_combo,
+         self.opt_refresh_calib_btn, self.opt_train_calib_btn, self.opt_show_calib_btn,
+         self.opt_calib_status_label, self.opt_calib_samples_label, self.opt_calib_update_label,
+         self.opt_calib_table,
+         self.opt_top_k_spin, self.opt_drift_window_spin,
+         self.opt_run_feat_btn, self.opt_refresh_feat_btn, self.opt_drift_check_btn,
+         self.opt_feat_table,
+         self.opt_use_gpu_check, self.opt_model_multi_edit,
+         self.opt_retrain_one_btn, self.opt_retrain_all_btn, self.opt_retrain_status_label,
+         self.opt_log_box) = create_optimization_tab(self.optimization_tab)
+
+        # 连接校准信号槽
+        self.opt_refresh_calib_btn.clicked.connect(self.refresh_calibration_status)
+        self.opt_train_calib_btn.clicked.connect(self.start_calibration)
+        self.opt_show_calib_btn.clicked.connect(self.show_calibration_curve)
+        # 连接特征分析信号槽
+        self.opt_run_feat_btn.clicked.connect(self.run_feature_analysis_ui)
+        self.opt_refresh_feat_btn.clicked.connect(self.refresh_feature_list)
+        self.opt_drift_check_btn.clicked.connect(self.check_feature_drift_ui)
+        # 连接重训练信号槽
+        self.opt_retrain_one_btn.clicked.connect(self.retrain_current_lottery)
+        self.opt_retrain_all_btn.clicked.connect(self.retrain_all_lotteries_ui)
+        # 彩票类型切换时刷新
+        self.opt_lottery_combo.currentIndexChanged.connect(self.refresh_calibration_status)
+        self.opt_lottery_combo.currentIndexChanged.connect(self.refresh_feature_list)
+
+        self.tab_widget.addTab(self.optimization_tab, "模型优化")
+
+        # 后台线程引用
+        self.calibration_thread = None
+        self.feature_analysis_thread = None
+        self.retrain_thread = None
 
         # 号码过滤标签页已隐藏
         
@@ -2713,6 +2750,348 @@ class LotteryPredictorApp(QMainWindow):
     def clear_ev_log(self):
         """清除期望值模型日志文本框的内容"""
         self.ev_log_box.clear()
+
+    # ==================== 模型优化标签页 - 校准 ====================
+
+    def _get_opt_lottery_type(self):
+        """获取优化标签页当前选中的彩票类型"""
+        return 'ssq' if self.opt_lottery_combo.currentIndex() == 0 else 'dlt'
+
+    def _opt_log(self, msg):
+        """写入模型优化日志框（带时间戳）"""
+        from datetime import datetime
+        self.opt_log_box.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+    def _set_opt_buttons_enabled(self, enabled):
+        """批量启用/禁用优化页操作按钮"""
+        for btn in [self.opt_refresh_calib_btn, self.opt_train_calib_btn,
+                    self.opt_show_calib_btn, self.opt_run_feat_btn,
+                    self.opt_refresh_feat_btn, self.opt_drift_check_btn,
+                    self.opt_retrain_one_btn, self.opt_retrain_all_btn]:
+            btn.setEnabled(enabled)
+
+    def refresh_calibration_status(self, *args):
+        """刷新校准状态显示"""
+        try:
+            from model_calibration import get_calibration_info
+            lottery_type = self._get_opt_lottery_type()
+            info = get_calibration_info(lottery_type)
+
+            red_ok = info.get('red_calibrated', False)
+            blue_ok = info.get('blue_calibrated', False)
+            red_samples = info.get('red_samples', 0)
+            blue_samples = info.get('blue_samples', 0)
+            last_update = info.get('last_update')
+
+            if red_ok and blue_ok:
+                self.opt_calib_status_label.setText("校准状态: 已校准")
+                self.opt_calib_status_label.setStyleSheet(
+                    "font-size: 11pt; font-weight: bold; color: #2E7D32;")
+            elif red_ok or blue_ok:
+                self.opt_calib_status_label.setText("校准状态: 部分校准")
+                self.opt_calib_status_label.setStyleSheet(
+                    "font-size: 11pt; font-weight: bold; color: #FF9800;")
+            else:
+                self.opt_calib_status_label.setText("校准状态: 未校准")
+                self.opt_calib_status_label.setStyleSheet(
+                    "font-size: 11pt; font-weight: bold; color: #F44336;")
+
+            self.opt_calib_samples_label.setText(
+                f"校准样本: 红球 {red_samples} / 蓝球 {blue_samples}")
+            self.opt_calib_update_label.setText(
+                f"更新时间: {last_update[:19] if last_update else '-'}")
+
+            # 填充校准状态表格
+            from PyQt5.QtGui import QColor
+            self.opt_calib_table.setRowCount(2)
+            for row, (ball, ok, samples) in enumerate([
+                ('红球', red_ok, red_samples), ('蓝球', blue_ok, blue_samples)
+            ]):
+                status_text = "已校准" if ok else "未校准"
+                color = "#2E7D32" if ok else "#F44336"
+                for col, text in enumerate([ball, status_text, str(samples), '-', 
+                                            last_update[:19] if last_update else '-']):
+                    item = QTableWidgetItem(text)
+                    if col == 1:
+                        item.setForeground(QColor(color))
+                    self.opt_calib_table.setItem(row, col, item)
+        except Exception as e:
+            self._opt_log(f"刷新校准状态失败: {e}")
+
+    def start_calibration(self):
+        """启动校准训练（后台线程）"""
+        lottery_type = self._get_opt_lottery_type()
+        reply = QMessageBox.question(
+            self, "确认校准",
+            f"确定对 {lottery_type.upper()} 训练校准模型？\n"
+            f"将使用已核验的预测记录作为训练数据。",
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._set_opt_buttons_enabled(False)
+        self._opt_log(f"开始训练 {lottery_type.upper()} 校准模型...")
+
+        self.calibration_thread = CalibrationThread(lottery_type)
+        self.calibration_thread.log_signal.connect(self._opt_log)
+        self.calibration_thread.finished_signal.connect(self._on_calibration_done)
+        self.calibration_thread.start()
+
+    def _on_calibration_done(self, success):
+        """校准完成回调"""
+        self._set_opt_buttons_enabled(True)
+        self._opt_log(f"校准流程结束: {'成功' if success else '失败'}")
+        self.refresh_calibration_status()
+        if success:
+            QMessageBox.information(self, "完成", "校准模型训练完成！")
+
+    def show_calibration_curve(self):
+        """显示校准曲线"""
+        try:
+            import matplotlib
+            matplotlib.use('Qt5Agg')
+            import matplotlib.pyplot as plt
+            from sklearn.isotonic import IsotonicRegression
+            from model_calibration import (load_calibration_model,
+                                           collect_calibration_data)
+            import numpy as np
+
+            lottery_type = self._get_opt_lottery_type()
+            red_model = load_calibration_model(lottery_type, 'red')
+            blue_model = load_calibration_model(lottery_type, 'blue')
+
+            if red_model is None and blue_model is None:
+                QMessageBox.warning(self, "提示", "尚无校准模型，请先训练。")
+                return
+
+            fig, ax = plt.subplots(figsize=(10, 7))
+            # 理想校准线
+            x = np.linspace(0, 1, 100)
+            ax.plot(x, x, 'k--', alpha=0.5, label='理想校准线')
+
+            for model, ball_name, color in [
+                (red_model, '红球', '#E53935'),
+                (blue_model, '蓝球', '#1E88E5')
+            ]:
+                if model is None:
+                    continue
+                calibrated = model.predict(x)
+                ax.plot(x, calibrated, color=color, linewidth=2,
+                        label=f'{ball_name}校准曲线')
+
+            # 散点：实际 (原始概率, 是否命中)
+            red_data, blue_data = collect_calibration_data(lottery_type)
+            if red_data:
+                probs, outcomes = zip(*red_data)
+                ax.scatter(probs, outcomes, alpha=0.3, s=20,
+                           color='#E53935', edgecolors='none', label='红球数据点')
+            if blue_data:
+                probs, outcomes = zip(*blue_data)
+                ax.scatter(probs, outcomes, alpha=0.3, s=20,
+                           color='#1E88E5', edgecolors='none', label='蓝球数据点')
+
+            ax.set_xlabel('预测概率')
+            ax.set_ylabel('实际频率')
+            ax.set_title(f'{lottery_type.upper()} 模型校准曲线')
+            ax.legend()
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            plt.show()
+        except Exception as e:
+            import traceback
+            self._opt_log(f"显示校准曲线失败: {e}\n{traceback.format_exc()}")
+            QMessageBox.critical(self, "错误", f"显示校准曲线失败:\n{e}")
+
+    # ==================== 模型优化标签页 - 特征分析 ====================
+
+    def refresh_feature_list(self, *args):
+        """刷新特征重要性列表（从已保存的分析结果读取）"""
+        try:
+            from feature_analysis import load_feature_importance
+            lottery_type = self._get_opt_lottery_type()
+            data = load_feature_importance()
+            importance = data.get(lottery_type, {}) if data else {}
+
+            if not importance:
+                self.opt_feat_table.setRowCount(0)
+                self._opt_log(f"暂无 {lottery_type.upper()} 的特征分析结果，请先运行分析")
+                return
+
+            # 按重要性排序
+            sorted_features = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+            top_k = self.opt_top_k_spin.value()
+            display = sorted_features[:top_k]
+
+            self.opt_feat_table.setRowCount(len(display))
+            for row, (feat, score) in enumerate(display):
+                self.opt_feat_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+                self.opt_feat_table.setItem(row, 1, QTableWidgetItem(feat))
+                self.opt_feat_table.setItem(row, 2, QTableWidgetItem(f"{score:.6f}"))
+                # 简单分类
+                if '遗漏' in feat or 'frequency' in feat.lower():
+                    cat = "频率类"
+                elif '和值' in feat or 'sum' in feat.lower():
+                    cat = "形态类"
+                elif '跨度' in feat or 'span' in feat.lower():
+                    cat = "形态类"
+                elif 'AC' in feat or '奇' in feat or '偶' in feat:
+                    cat = "结构类"
+                else:
+                    cat = "其他"
+                self.opt_feat_table.setItem(row, 3, QTableWidgetItem(cat))
+        except Exception as e:
+            self._opt_log(f"刷新特征列表失败: {e}")
+
+    def run_feature_analysis_ui(self):
+        """运行完整特征分析（后台线程）"""
+        lottery_type = self._get_opt_lottery_type()
+        reply = QMessageBox.question(
+            self, "确认运行",
+            f"对 {lottery_type.upper()} 运行完整特征分析？\n"
+            f"包括特征重要性、漂移检测和特征选择。",
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._set_opt_buttons_enabled(False)
+        self._opt_log(f"开始 {lottery_type.upper()} 特征分析...")
+
+        self.feature_analysis_thread = FeatureAnalysisThread(
+            lottery_type, top_k=self.opt_top_k_spin.value(),
+            drift_window=self.opt_drift_window_spin.value())
+        self.feature_analysis_thread.log_signal.connect(self._opt_log)
+        self.feature_analysis_thread.result_signal.connect(self._on_feature_result)
+        self.feature_analysis_thread.drift_signal.connect(self._on_drift_result)
+        self.feature_analysis_thread.finished_signal.connect(self._on_feature_done)
+        self.feature_analysis_thread.start()
+
+    def _on_feature_result(self, result):
+        """特征分析结果回调：填充表格"""
+        top_features = result.get('top_features', [])
+        all_features = result.get('all_features', {})
+
+        # 优先用重要性排序
+        if isinstance(all_features, dict) and all_features:
+            sorted_features = sorted(all_features.items(),
+                                     key=lambda x: x[1] if isinstance(x[1], (int, float)) else 0,
+                                     reverse=True)
+            display = sorted_features[:self.opt_top_k_spin.value()]
+        elif top_features:
+            display = [(f, 0.0) for f in top_features]
+        else:
+            display = []
+
+        self.opt_feat_table.setRowCount(len(display))
+        for row, (feat, score) in enumerate(display):
+            self.opt_feat_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+            self.opt_feat_table.setItem(row, 1, QTableWidgetItem(str(feat)))
+            self.opt_feat_table.setItem(row, 2, QTableWidgetItem(f"{score:.6f}" if score else '-'))
+            self.opt_feat_table.setItem(row, 3, QTableWidgetItem("其他"))
+
+    def _on_drift_result(self, drift_result):
+        """漂移检测结果回调"""
+        if not drift_result:
+            return
+        if 'error' in drift_result:
+            self._opt_log(f"漂移检测出错: {drift_result['error']}")
+            return
+        if 'reason' in drift_result and not drift_result.get('drift_detected'):
+            self._opt_log(f"漂移检测: {drift_result['reason']}")
+            return
+
+        if drift_result.get('drift_detected'):
+            drifted = [k for k, v in drift_result.get('feature_drift', {}).items()
+                       if v.get('is_drifting')]
+            self._opt_log(f"警告: 检测到 {len(drifted)} 个特征发生漂移: {', '.join(drifted[:10])}")
+        else:
+            self._opt_log("漂移检测: 未发现显著特征漂移")
+
+    def _on_feature_done(self, success):
+        """特征分析完成"""
+        self._set_opt_buttons_enabled(True)
+        self._opt_log(f"特征分析流程结束: {'成功' if success else '失败'}")
+        self.refresh_feature_list()
+        if success:
+            QMessageBox.information(self, "完成", "特征分析完成！")
+
+    def check_feature_drift_ui(self):
+        """单独运行漂移检测（后台线程）"""
+        lottery_type = self._get_opt_lottery_type()
+        self._set_opt_buttons_enabled(False)
+        self._opt_log(f"开始检测 {lottery_type.upper()} 特征漂移...")
+
+        self.feature_analysis_thread = FeatureAnalysisThread(
+            lottery_type, top_k=5,
+            drift_window=self.opt_drift_window_spin.value(),
+            check_drift=True)
+        self.feature_analysis_thread.log_signal.connect(self._opt_log)
+        self.feature_analysis_thread.result_signal.connect(lambda r: None)
+        self.feature_analysis_thread.drift_signal.connect(self._on_drift_result)
+        self.feature_analysis_thread.finished_signal.connect(self._on_feature_done)
+        self.feature_analysis_thread.start()
+
+    # ==================== 模型优化标签页 - 反馈重训练 ====================
+
+    def retrain_current_lottery(self):
+        """重训练当前彩票的ML模型"""
+        lottery_type = self._get_opt_lottery_type()
+        use_gpu = self.opt_use_gpu_check.isChecked()
+
+        reply = QMessageBox.question(
+            self, "确认重训练",
+            f"重训练 {lottery_type.upper()} 的 ML 模型？\n\n"
+            f"使用GPU: {'是' if use_gpu else '否'}\n"
+            f"模型: {self.opt_model_multi_edit.text() or '全部'}\n\n"
+            f"此过程可能耗时较长，确定继续？",
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._set_opt_buttons_enabled(False)
+        self._opt_log(f"开始重训练 {lottery_type.upper()} 模型 (GPU={'开' if use_gpu else '关'})...")
+
+        self.retrain_thread = RetrainThread(
+            lottery_type=lottery_type, use_gpu=use_gpu)
+        self.retrain_thread.log_signal.connect(self._opt_log)
+        self.retrain_thread.finished_signal.connect(self._on_retrain_done)
+        self.retrain_thread.start()
+
+    def retrain_all_lotteries_ui(self):
+        """重训练全部彩票模型"""
+        use_gpu = self.opt_use_gpu_check.isChecked()
+
+        reply = QMessageBox.question(
+            self, "确认全部重训练",
+            f"重训练全部彩票 (SSQ + DLT) 的 ML 模型？\n\n"
+            f"使用GPU: {'是' if use_gpu else '否'}\n\n"
+            f"此过程可能耗时很长，确定继续？",
+            QMessageBox.Yes | QMessageBox.No)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._set_opt_buttons_enabled(False)
+        self._opt_log("开始重训练全部彩票模型...")
+
+        self.retrain_thread = RetrainThread(
+            retrain_all=True, use_gpu=use_gpu)
+        self.retrain_thread.log_signal.connect(self._opt_log)
+        self.retrain_thread.finished_signal.connect(self._on_retrain_done)
+        self.retrain_thread.start()
+
+    def _on_retrain_done(self, success):
+        """重训练完成回调"""
+        from datetime import datetime
+        self._set_opt_buttons_enabled(True)
+        status = "成功" if success else "失败"
+        self._opt_log(f"重训练结束: {status}")
+        self.opt_retrain_status_label.setText(
+            f"上次重训练: {datetime.now().strftime('%Y-%m-%d %H:%M')} ({status})")
+        if success:
+            QMessageBox.information(self, "完成", "模型重训练完成！")
+        else:
+            QMessageBox.warning(self, "警告", "部分模型重训练失败，请查看日志。")
 
 def main():
     app = QApplication(sys.argv)

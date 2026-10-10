@@ -554,3 +554,153 @@ class DataCheckThread(QThread):
             if draw_num:
                 return int(draw_num)
         return None
+
+
+# ============ 模型优化相关线程 ============
+
+class CalibrationThread(QThread):
+    """模型校准后台线程"""
+    log_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool)  # 是否成功
+
+    def __init__(self, lottery_type='ssq'):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.should_terminate = False
+
+    def run(self):
+        try:
+            from model_calibration import calibrate_lottery, get_calibration_info, collect_calibration_data
+
+            self.log_signal.emit(f"开始校准 {self.lottery_type} ...")
+
+            # 先收集数据看有多少
+            red_data, blue_data = collect_calibration_data(self.lottery_type)
+            red_count = sum(len(v) for v in red_data.values()) if red_data else 0
+            blue_count = sum(len(v) for v in blue_data.values()) if blue_data else 0
+            self.log_signal.emit(f"红球样本: {red_count}, 蓝球样本: {blue_count}")
+
+            if red_count == 0 and blue_count == 0:
+                self.log_signal.emit("没有可用的校准数据（需要先核验预测记录）")
+                self.finished_signal.emit(False)
+                return
+
+            success = calibrate_lottery(self.lottery_type)
+            if success:
+                info = get_calibration_info(self.lottery_type)
+                self.log_signal.emit(f"校准完成! 红球: {'已校准' if info.get('red_calibrated') else '未校准'}, "
+                                     f"蓝球: {'已校准' if info.get('blue_calibrated') else '未校准'}")
+            else:
+                self.log_signal.emit("校准失败或数据不足")
+
+            self.finished_signal.emit(success)
+
+        except Exception as e:
+            self.log_signal.emit(f"校准出错: {e}")
+            self.finished_signal.emit(False)
+
+
+class FeatureAnalysisThread(QThread):
+    """特征分析后台线程"""
+    log_signal = pyqtSignal(str)
+    result_signal = pyqtSignal(dict)  # 特征重要性列表
+    drift_signal = pyqtSignal(dict)   # 漂移检测结果
+    finished_signal = pyqtSignal(bool)
+
+    def __init__(self, lottery_type='ssq', top_k=20, drift_window=30, check_drift=False):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.top_k = top_k
+        self.drift_window = drift_window
+        self.check_drift = check_drift
+        self.should_terminate = False
+
+    def run(self):
+        try:
+            from feature_analysis import run_feature_analysis, select_top_features, detect_feature_drift
+
+            # 仅漂移检测模式：直接检测，不跑完整分析
+            if self.check_drift:
+                self.log_signal.emit(f"检测特征漂移 {self.lottery_type} (窗口={self.drift_window})...")
+                try:
+                    drift_result = detect_feature_drift(self.lottery_type, self.drift_window)
+                    self.drift_signal.emit(drift_result)
+                except Exception as e:
+                    self.drift_signal.emit({'error': str(e)})
+                self.finished_signal.emit(True)
+                return
+
+            self.log_signal.emit(f"开始特征分析 {self.lottery_type}...")
+
+            # 运行特征分析（内部已包含漂移检测）
+            result = run_feature_analysis(self.lottery_type)
+            if result.get('status') == 'completed':
+                selected = result.get('selected_features', [])
+                self.log_signal.emit(f"特征分析完成，选择了 {len(selected)} 个特征")
+            else:
+                self.log_signal.emit(f"特征分析: {result.get('error', '未知')}")
+
+            # 获取 Top 特征
+            try:
+                top_features = select_top_features(self.lottery_type, top_k=self.top_k)
+                self.log_signal.emit(f"已获取 Top {self.top_k} 特征")
+            except Exception as e:
+                self.log_signal.emit(f"获取 Top 特征失败: {e}")
+                top_features = []
+
+            self.result_signal.emit({
+                'status': result.get('status'),
+                'top_features': top_features,
+                'all_features': result.get('feature_importance', [])
+            })
+
+            # 把完整分析中已算出的漂移结果回传给UI
+            if result.get('feature_drift'):
+                self.drift_signal.emit(result['feature_drift'])
+
+            self.finished_signal.emit(True)
+
+        except Exception as e:
+            self.log_signal.emit(f"特征分析出错: {e}")
+            self.finished_signal.emit(False)
+
+
+class RetrainThread(QThread):
+    """反馈重训练后台线程"""
+    log_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool)
+
+    def __init__(self, lottery_type=None, use_gpu=False, model_types=None, retrain_all=False):
+        super().__init__()
+        self.lottery_type = lottery_type
+        self.use_gpu = use_gpu
+        self.model_types = model_types
+        self.retrain_all = retrain_all
+        self.should_terminate = False
+
+    def run(self):
+        try:
+            from retrain_models_with_feedback import retrain_lottery_models, retrain_all_lotteries
+
+            if self.retrain_all:
+                self.log_signal.emit("开始重训练全部彩票模型...")
+                # retrain_all_lotteries 只接受 use_gpu，返回 {lottery: bool}
+                results = retrain_all_lotteries(use_gpu=self.use_gpu)
+                all_ok = all(results.values()) if results else False
+                for lt, ok in results.items():
+                    self.log_signal.emit(f"  {lt.upper()}: {'成功' if ok else '失败'}")
+                self.log_signal.emit(f"全部彩票重训练{'完成' if all_ok else '部分失败'}")
+                self.finished_signal.emit(all_ok)
+            else:
+                self.log_signal.emit(f"开始重训练 {self.lottery_type} 模型...")
+                success = retrain_lottery_models(
+                    lottery_type=self.lottery_type,
+                    use_gpu=self.use_gpu,
+                    model_types=self.model_types
+                )
+                self.log_signal.emit(f"{self.lottery_type} 重训练{'完成' if success else '失败'}")
+                self.finished_signal.emit(success)
+
+        except Exception as e:
+            self.log_signal.emit(f"重训练出错: {e}")
+            self.finished_signal.emit(False)
