@@ -1693,8 +1693,13 @@ class LotteryPredictorApp(QMainWindow):
         )
         self.auto_predict_thread.log_signal.connect(self.update_log)
         self.auto_predict_thread.step_signal.connect(lambda s: self.statusBar().showMessage(s))
+        self.auto_predict_thread.predictions_signal.connect(self._auto_predict_collect_predictions)
         self.auto_predict_thread.finished_signal.connect(self.on_auto_predict_finished)
         self.auto_predict_thread.start()
+
+    def _auto_predict_collect_predictions(self, predictions):
+        """收集一键预测产出的结构化预测结果，待完成回调中统一存档"""
+        self._auto_predict_pending = predictions
 
     def on_auto_predict_finished(self, success, result_text):
         """一键智能预测完成回调"""
@@ -1712,20 +1717,16 @@ class LotteryPredictorApp(QMainWindow):
         if success:
             self.result_label.setText(result_text)
             self.update_log("一键智能预测完成。")
-            # 自动存档（复用现有存档机制）
-            from prediction_records import save_prediction_record
-            try:
-                # 解析 result_text 取号码（这里简化：直接保存全文）
-                save_prediction_record(
-                    lottery_type=self.lottery_combo.currentText(),
-                    model_type=self.model_combo.currentText(),
-                    latest_period="自动预测",
-                    numbers_text=result_text,
-                    log_callback=self.update_log
-                )
-                self.update_log("预测记录已自动存档。")
-            except Exception as e:
-                self.update_log(f"存档预测记录时出错: {e}")
+            # 自动存档：复用普通预测的存档机制（读取最新期号、逐注写入）
+            pending = getattr(self, '_auto_predict_pending', None)
+            if pending:
+                # AutoPredictThread 内保存了正确的 key（'ssq'/'dlt'）与 model_type
+                t_lottery = self.auto_predict_thread.lottery_type
+                t_model = self.auto_predict_thread.model_type
+                self._save_prediction_records(t_lottery, t_model, pending)
+                self._auto_predict_pending = None
+            else:
+                self.update_log("（未获取到结构化预测结果，本次未存档）")
         else:
             self.result_label.setText("一键智能预测失败，请查看日志了解详情。")
             self.update_log("一键智能预测失败。")

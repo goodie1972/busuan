@@ -315,6 +315,7 @@ class AutoPredictThread(QThread):
     log_signal = pyqtSignal(str)
     step_signal = pyqtSignal(str)       # 当前步骤名
     finished_signal = pyqtSignal(bool, str)  # (是否成功, 结果文本)
+    predictions_signal = pyqtSignal(object)  # 结构化预测列表 [(red, blue), ...]，供主线程存档
 
     def __init__(self, lottery_type, model_type='gbdt', num_predictions=3,
                  use_gpu=False, skip_fetch=False, skip_train=False):
@@ -446,6 +447,7 @@ class AutoPredictThread(QThread):
 
             result_text = "\n".join(result_lines)
             self.log_signal.emit("预测生成完成。")
+            self.predictions_signal.emit(all_predictions)
             self.finished_signal.emit(True, result_text)
 
         except Exception as e:
