@@ -12,6 +12,12 @@ import torch
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from ml_models import LotteryMLModels, MODEL_TYPES
 
+# 在主线程(应用启动时)预加载模型优化相关模块的原生依赖(sklearn/joblib等)。
+# 若留到后台工作线程内首次 import, 原生库加载与 torch 的 OpenMP 运行时
+# 竞争, 在部分 Windows 环境下会导致进程级崩溃(表现为校准/特征分析时闪退)。
+import feature_analysis    # noqa: E402,F401  (内含 backtest/pandas/numpy 依赖链)
+import model_calibration   # noqa: E402,F401  (joblib 原生库)
+
 from model_utils import name_path
 
 class LogEmitter(QObject):

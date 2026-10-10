@@ -15,11 +15,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-10T15:49:36",
@@ -37,11 +37,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-10T15:49:36",
@@ -59,11 +59,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-10T15:49:36",
@@ -81,11 +81,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-10T15:49:36",
@@ -103,11 +103,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:49:32",
@@ -125,11 +125,11 @@
       8,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:49:32",
@@ -147,11 +147,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:49:32",
@@ -169,11 +169,11 @@
       8,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:49:32",
@@ -191,11 +191,11 @@
       7,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:49:32",
@@ -213,11 +213,11 @@
       10,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:51:58",
@@ -235,11 +235,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:51:58",
@@ -257,11 +257,11 @@
       7,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:51:58",
@@ -279,11 +279,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:51:58",
@@ -301,11 +301,11 @@
       2,
       6
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:51:58",
@@ -323,11 +323,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:54:38",
@@ -345,11 +345,11 @@
       2,
       6
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:54:38",
@@ -367,11 +367,11 @@
       2,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:54:38",
@@ -389,11 +389,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:54:38",
@@ -411,11 +411,11 @@
       2,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T09:54:38",
@@ -433,11 +433,11 @@
       2,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:48",
@@ -455,11 +455,11 @@
       2,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:48",
@@ -477,11 +477,11 @@
       2,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:48",
@@ -499,11 +499,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:48",
@@ -521,11 +521,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:48",
@@ -543,11 +543,11 @@
       1,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:54",
@@ -565,11 +565,11 @@
       8,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 2,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-12T10:16:54",
@@ -587,11 +587,11 @@
       6,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:54",
@@ -609,11 +609,11 @@
       1,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:54",
@@ -631,11 +631,11 @@
       1,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-12T10:16:54",
@@ -653,11 +653,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26104,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:15:47",
@@ -675,11 +675,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:15:47",
@@ -697,11 +697,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:15:47",
@@ -719,11 +719,11 @@
       1,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 2,
+    "blue_hits": 1,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-13T09:15:47",
@@ -741,11 +741,11 @@
       1,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:15:47",
@@ -763,11 +763,11 @@
       1,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 2,
+    "blue_hits": 1,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-13T09:46:51",
@@ -785,11 +785,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:46:51",
@@ -807,11 +807,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:46:51",
@@ -829,11 +829,11 @@
       1,
       8
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:46:51",
@@ -851,11 +851,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-13T09:46:51",
@@ -873,11 +873,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26105,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:43:08",
@@ -895,11 +895,11 @@
       3,
       6
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:43:08",
@@ -917,11 +917,11 @@
       3,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:43:08",
@@ -939,11 +939,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:43:08",
@@ -961,11 +961,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:43:08",
@@ -983,11 +983,11 @@
       3,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:54:17",
@@ -1005,11 +1005,11 @@
       2,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:54:17",
@@ -1027,11 +1027,11 @@
       1,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:54:17",
@@ -1049,11 +1049,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:54:17",
@@ -1071,11 +1071,11 @@
       2,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:54:17",
@@ -1093,11 +1093,11 @@
       4,
       8
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26106,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:57:17",
@@ -1115,11 +1115,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:57:17",
@@ -1137,11 +1137,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-15T09:57:17",
@@ -1159,11 +1159,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T09:57:17",
@@ -1181,11 +1181,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-15T09:57:17",
@@ -1203,11 +1203,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T10:04:47",
@@ -1225,11 +1225,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-15T10:04:47",
@@ -1247,11 +1247,11 @@
     "blue_numbers": [
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-15T10:04:47",
@@ -1269,11 +1269,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-15T10:04:47",
@@ -1291,11 +1291,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-15T10:04:47",
@@ -1313,11 +1313,11 @@
     "blue_numbers": [
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "六等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-18T09:06:26",
@@ -1335,11 +1335,11 @@
       2,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:06:26",
@@ -1357,11 +1357,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:06:26",
@@ -1379,11 +1379,11 @@
       9,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:06:26",
@@ -1401,11 +1401,11 @@
       3,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:06:26",
@@ -1423,11 +1423,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:10:03",
@@ -1445,11 +1445,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:10:03",
@@ -1467,11 +1467,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:10:03",
@@ -1489,11 +1489,11 @@
       11,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:10:03",
@@ -1511,11 +1511,11 @@
       7,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T09:10:03",
@@ -1533,11 +1533,11 @@
       9,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26107,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:01:43",
@@ -1555,11 +1555,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 3,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:01:43",
@@ -1577,11 +1577,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:01:43",
@@ -1599,11 +1599,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:01:43",
@@ -1621,11 +1621,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:01:43",
@@ -1643,11 +1643,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:03:57",
@@ -1665,11 +1665,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:03:57",
@@ -1687,11 +1687,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:03:57",
@@ -1709,11 +1709,11 @@
     "blue_numbers": [
       14
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:03:57",
@@ -1731,11 +1731,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-18T10:03:57",
@@ -1753,11 +1753,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T09:39:13",
@@ -1775,11 +1775,11 @@
       2,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 3,
+    "blue_hits": 0,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-20T09:39:13",
@@ -1797,11 +1797,11 @@
       8,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T09:39:13",
@@ -1819,11 +1819,11 @@
       4,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T09:39:13",
@@ -1841,11 +1841,11 @@
       6,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T09:39:13",
@@ -1863,11 +1863,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:25:10",
@@ -1885,11 +1885,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:25:10",
@@ -1907,11 +1907,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:25:10",
@@ -1929,11 +1929,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:25:10",
@@ -1951,11 +1951,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:25:10",
@@ -1973,11 +1973,11 @@
       9,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:29:54",
@@ -1995,11 +1995,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:29:54",
@@ -2017,11 +2017,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:29:54",
@@ -2039,11 +2039,11 @@
       7,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:29:54",
@@ -2061,11 +2061,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:29:54",
@@ -2083,11 +2083,11 @@
       9,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26108,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:48",
@@ -2105,11 +2105,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:48",
@@ -2127,11 +2127,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:48",
@@ -2149,11 +2149,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:48",
@@ -2171,11 +2171,11 @@
     "blue_numbers": [
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:48",
@@ -2193,11 +2193,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:52",
@@ -2215,11 +2215,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:52",
@@ -2237,11 +2237,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:52",
@@ -2259,11 +2259,11 @@
     "blue_numbers": [
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:52",
@@ -2281,11 +2281,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:35:52",
@@ -2303,11 +2303,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:36:26",
@@ -2325,11 +2325,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:36:26",
@@ -2347,11 +2347,11 @@
     "blue_numbers": [
       13
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:36:26",
@@ -2369,11 +2369,11 @@
     "blue_numbers": [
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:36:26",
@@ -2391,11 +2391,11 @@
     "blue_numbers": [
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-20T10:36:26",
@@ -2413,11 +2413,11 @@
     "blue_numbers": [
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:40:50",
@@ -2435,11 +2435,11 @@
       3,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:40:50",
@@ -2457,11 +2457,11 @@
       6,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:40:50",
@@ -2479,11 +2479,11 @@
       5,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:40:50",
@@ -2501,11 +2501,11 @@
       1,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:40:50",
@@ -2523,11 +2523,11 @@
       3,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:44:19",
@@ -2545,11 +2545,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:44:19",
@@ -2567,11 +2567,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:44:19",
@@ -2589,11 +2589,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:44:19",
@@ -2611,11 +2611,11 @@
       1,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:44:19",
@@ -2633,11 +2633,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:52:36",
@@ -2655,11 +2655,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:52:36",
@@ -2677,11 +2677,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:52:36",
@@ -2699,11 +2699,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:52:36",
@@ -2721,11 +2721,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:52:36",
@@ -2743,11 +2743,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:53:10",
@@ -2765,11 +2765,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:53:10",
@@ -2787,11 +2787,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:53:10",
@@ -2809,11 +2809,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 3,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:53:10",
@@ -2831,11 +2831,11 @@
     "blue_numbers": [
       16
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-22T08:53:10",
@@ -2853,11 +2853,11 @@
     "blue_numbers": [
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2875,11 +2875,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2897,11 +2897,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2919,11 +2919,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2941,11 +2941,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2963,11 +2963,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-23T19:45:26",
@@ -2985,11 +2985,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26109,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3007,11 +3007,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3029,11 +3029,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3051,11 +3051,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3073,11 +3073,11 @@
       2,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3095,11 +3095,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:14:12",
@@ -3117,11 +3117,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 2,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-24T09:32:35",
@@ -3843,11 +3843,11 @@
       6,
       9
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T13:16:44",
@@ -3865,11 +3865,11 @@
       3,
       6
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T13:16:44",
@@ -3887,11 +3887,11 @@
       2,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T13:16:44",
@@ -3909,11 +3909,11 @@
       6,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T13:16:44",
@@ -3931,11 +3931,11 @@
       3,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 2,
+    "blue_hits": 1,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-27T13:21:28",
@@ -4283,11 +4283,11 @@
       5,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T15:44:25",
@@ -4305,11 +4305,11 @@
       7,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T15:44:25",
@@ -4327,11 +4327,11 @@
       7,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T15:44:25",
@@ -4349,11 +4349,11 @@
       5,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T15:44:25",
@@ -4371,11 +4371,11 @@
       9,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26110,
+    "red_hits": 0,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4393,11 +4393,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 3,
+    "blue_hits": 2,
+    "prize_name": "六等奖",
+    "prize_amount": 200
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4415,11 +4415,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 1,
+    "blue_hits": 2,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4437,11 +4437,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 2,
+    "blue_hits": 2,
+    "prize_name": "八等奖",
+    "prize_amount": 15
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4459,11 +4459,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 1,
+    "blue_hits": 2,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4481,11 +4481,11 @@
       1,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 3,
+    "blue_hits": 2,
+    "prize_name": "六等奖",
+    "prize_amount": 200
   },
   {
     "predict_time": "2026-09-27T16:02:36",
@@ -4503,11 +4503,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26111,
+    "red_hits": 2,
+    "blue_hits": 1,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-09-27T19:35:07",
@@ -5185,11 +5185,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:34:14",
@@ -5207,11 +5207,11 @@
       1,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:34:14",
@@ -5229,11 +5229,11 @@
       1,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:34:14",
@@ -5251,11 +5251,11 @@
       1,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:34:14",
@@ -5273,11 +5273,11 @@
       1,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:34:14",
@@ -5295,11 +5295,11 @@
       1,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5317,11 +5317,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5339,11 +5339,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5361,11 +5361,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5383,11 +5383,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5405,11 +5405,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:05",
@@ -5427,11 +5427,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5449,11 +5449,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5471,11 +5471,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5493,11 +5493,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5515,11 +5515,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5537,11 +5537,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T10:35:19",
@@ -5559,11 +5559,11 @@
       6,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:38:33",
@@ -5691,11 +5691,11 @@
       4,
       5
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:03",
@@ -5713,11 +5713,11 @@
       1,
       2
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:03",
@@ -5735,11 +5735,11 @@
       2,
       3
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:03",
@@ -5757,11 +5757,11 @@
       3,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:03",
@@ -5779,11 +5779,11 @@
       5,
       6
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:27",
@@ -5801,11 +5801,11 @@
       4,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:27",
@@ -5823,11 +5823,11 @@
       1,
       8
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:27",
@@ -5845,11 +5845,11 @@
       5,
       10
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 0,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:27",
@@ -5867,11 +5867,11 @@
       2,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 0,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-09-29T20:53:27",
@@ -5889,11 +5889,11 @@
       3,
       4
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26112,
+    "red_hits": 1,
+    "blue_hits": 1,
+    "prize_name": "未中奖",
+    "prize_amount": 0
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -5911,11 +5911,11 @@
       6,
       8
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 3,
+    "blue_hits": 0,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -5933,11 +5933,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 3,
+    "blue_hits": 1,
+    "prize_name": "八等奖",
+    "prize_amount": 15
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -5955,11 +5955,11 @@
       2,
       7
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 3,
+    "blue_hits": 0,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -5977,11 +5977,11 @@
       10,
       11
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 3,
+    "blue_hits": 1,
+    "prize_name": "八等奖",
+    "prize_amount": 15
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -5999,11 +5999,11 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 2,
+    "blue_hits": 1,
+    "prize_name": "九等奖",
+    "prize_amount": 5
   },
   {
     "predict_time": "2026-10-01T11:04:13",
@@ -6021,10 +6021,10 @@
       10,
       12
     ],
-    "target_period": null,
-    "red_hits": null,
-    "blue_hits": null,
-    "prize_name": null,
-    "prize_amount": null
+    "target_period": 26113,
+    "red_hits": 3,
+    "blue_hits": 1,
+    "prize_name": "八等奖",
+    "prize_amount": 15
   }
 ]

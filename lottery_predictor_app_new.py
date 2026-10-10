@@ -6,9 +6,18 @@ Author: Yang Zhao
 import sys
 import os
 import io
+
+# ===== 导入顺序约束（重要）=====
+# torch 必须先于 numpy/pandas/sklearn 导入：
+# 若 numpy 的 OpenMP 运行时先加载，torch 再加载时会发生运行时冲突，
+# 表现为 WinError 1114 DLL 初始化失败或进程直接 segfault
+# （本应用中触发点：校准线程 import sklearn.joblib 时进程崩溃）
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("KMP_INIT_AT_FORK", "FALSE")
+import torch
+
 import pandas as pd
 import numpy as np
-import torch
 import time
 import logging
 import itertools
@@ -297,6 +306,9 @@ class LotteryPredictorApp(QMainWindow):
         # 彩票类型切换时刷新
         self.opt_lottery_combo.currentIndexChanged.connect(self.refresh_calibration_status)
         self.opt_lottery_combo.currentIndexChanged.connect(self.refresh_feature_list)
+
+        # 切换到本标签页时自动刷新（首次进入即有最新状态，无需手动点刷新）
+        self.tab_widget.currentChanged.connect(self._on_opt_tab_shown)
 
         self.tab_widget.addTab(self.optimization_tab, "模型优化")
 
@@ -2762,6 +2774,12 @@ class LotteryPredictorApp(QMainWindow):
         """写入模型优化日志框（带时间戳）"""
         from datetime import datetime
         self.opt_log_box.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+
+    def _on_opt_tab_shown(self, index):
+        """切换到'模型优化'标签页时自动刷新校准状态与特征列表"""
+        if index == self.tab_widget.indexOf(self.optimization_tab):
+            self.refresh_calibration_status()
+            self.refresh_feature_list()
 
     def _set_opt_buttons_enabled(self, enabled):
         """批量启用/禁用优化页操作按钮"""
