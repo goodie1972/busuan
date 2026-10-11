@@ -1512,6 +1512,7 @@ def create_prediction_records_tab(records_tab):
 
     # ---- 记录表格 ----
     records_table = QTableWidget()
+    records_table.setSelectionMode(QAbstractItemView.ExtendedSelection)  # 支持多选，便于批量核验
     records_table.setColumnCount(10)
     records_table.setHorizontalHeaderLabels([
         "序号", "预测时间", "彩票", "模型", "最新期号",

@@ -82,9 +82,14 @@ def add_prediction_record(lottery_type, model_type, latest_period,
         return None
 
 
-def verify_records(log_callback=None):
+def verify_records(log_callback=None, records_subset=None):
     """
-    核验全部预测记录：为每条寻找目标开奖期并比对命中与奖级。
+    核验预测记录：为每条寻找目标开奖期并比对命中与奖级。
+
+    Args:
+        log_callback: 日志回调
+        records_subset: 可选，只核验这些记录对应的下标（在全部记录列表中的下标）；
+                        None 表示核验全部
 
     Returns:
         dict 核验报告：
@@ -125,7 +130,10 @@ def verify_records(log_callback=None):
                          if c.startswith('蓝球_') or c == '蓝球']
 
     changed = False
-    for rec in records:
+    subset = set(records_subset) if records_subset is not None else None
+    for idx, rec in enumerate(records):
+        if subset is not None and idx not in subset:
+            continue
         lt = rec.get('lottery_type')
         if lt not in dfs:
             continue  # 数据文件缺失，保持待核验
@@ -155,7 +163,7 @@ def verify_records(log_callback=None):
     if changed:
         save_records(records)
 
-    # 汇总
+    # 汇总（报告始终反映全部记录的总体状态）
     verified = [r for r in records if r.get('target_period') is not None]
     pending = [r for r in records if r.get('target_period') is None]
     prize_counts = {}

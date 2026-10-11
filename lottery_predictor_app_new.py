@@ -905,7 +905,15 @@ class LotteryPredictorApp(QMainWindow):
                     red_nums, blue_nums = prediction[0], prediction[1]
                     red_proba = None
                     blue_proba = None
-                    
+
+                # 模型概率输出为全类别概率字典 {号码-1: 概率}，在此转成
+                # 按号码对齐的概率列表（长度必须等于号码个数；否则校准收集
+                # 时因 len 不匹配会把每条记录都跳过，导致校准永远 0 样本）
+                if isinstance(red_proba, dict):
+                    red_proba = [float(red_proba.get(int(n) - 1, 0.0)) for n in red_nums]
+                if isinstance(blue_proba, dict):
+                    blue_proba = [float(blue_proba.get(int(n) - 1, 0.0)) for n in blue_nums]
+
                 count = add_prediction_record(
                     lottery_type, model_type, latest_period,
                     red_nums, blue_nums, red_proba, blue_proba)
@@ -1113,7 +1121,7 @@ class LotteryPredictorApp(QMainWindow):
             }
 
             filtered = []
-            for rec in records:
+            for rec_idx, rec in enumerate(records):
                 lt = rec.get('lottery_type', '')
                 if lottery_filter != "全部" and lottery_map.get(lottery_filter) != lt:
                     continue
@@ -1128,12 +1136,14 @@ class LotteryPredictorApp(QMainWindow):
                     continue
                 if status_filter == "已中奖" and (prize is None or "未中" in str(prize)):
                     continue
-                filtered.append(rec)
+                filtered.append((rec_idx, rec))
 
             self.records_table.setRowCount(0)
-            for i, rec in enumerate(reversed(filtered)):
+            self._records_row_index = {}  # 表格行号 -> 全部记录中的下标（供"核验选中"）
+            for i, (rec_idx, rec) in enumerate(reversed(filtered)):
                 row = self.records_table.rowCount()
                 self.records_table.insertRow(row)
+                self._records_row_index[row] = rec_idx
                 self.records_table.setItem(row, 0, QTableWidgetItem(str(len(filtered) - i)))
                 self.records_table.setItem(row, 1, QTableWidgetItem(rec.get('predict_time', '?')[:19]))
                 lt_name = "双色球" if rec.get('lottery_type') == 'ssq' else "大乐透"
@@ -1161,26 +1171,38 @@ class LotteryPredictorApp(QMainWindow):
                 self.records_table.setItem(row, 8, QTableWidgetItem(prize_text))
                 self.records_table.setItem(row, 9, QTableWidgetItem(amount_text))
 
-            verified = sum(1 for r in filtered if r.get('prize_name') is not None)
-            won = sum(1 for r in filtered if r.get('prize_name') and "未中" not in str(r.get('prize_name')))
+            verified = sum(1 for _, r in filtered if r.get('prize_name') is not None)
+            won = sum(1 for _, r in filtered if r.get('prize_name') and "未中" not in str(r.get('prize_name')))
             self.rec_stats_label.setText(
                 f"共 {len(filtered)} 条记录 | {verified} 条已核验 | {won} 条中奖")
         except Exception as e:
             self.log_emitter.new_log.emit(f"刷新预测记录失败: {e}")
 
     def verify_selected_prediction_records(self):
-        """核验选中的预测记录"""
+        """核验选中的预测记录（未选中则核验全部，免去逐条勾选）"""
+        selected_rows = sorted({item.row() for item in self.records_table.selectedItems()})
+        idx_map = getattr(self, '_records_row_index', {})
+        if selected_rows:
+            subset = [idx_map[r] for r in selected_rows if r in idx_map]
+        else:
+            subset = None
+        self._do_verify_records(subset)
+
+    def verify_all_prediction_records(self):
+        """核验全部预测记录"""
+        self._do_verify_records(None)
+
+    def _do_verify_records(self, subset):
         try:
             from prediction_records import verify_records
-            verify_records(log_callback=lambda msg: self.log_emitter.new_log.emit(msg))
+            self.log_emitter.new_log.emit(
+                f"开始核验{'选中 ' + str(len(subset)) + ' 条' if subset else '全部'}记录...")
+            verify_records(log_callback=lambda msg: self.log_emitter.new_log.emit(msg),
+                           records_subset=subset)
             self.refresh_prediction_records()
             self.log_emitter.new_log.emit("预测记录核验完成")
         except Exception as e:
             self.log_emitter.new_log.emit(f"核验失败: {e}")
-
-    def verify_all_prediction_records(self):
-        """全部核验"""
-        self.verify_selected_prediction_records()
 
     def export_prediction_records(self):
         """导出预测记录为CSV"""
@@ -1252,8 +1274,8 @@ class LotteryPredictorApp(QMainWindow):
         try:
             from prediction_records import load_records
             records = load_records()
-            # 取最近 20 条
-            recent = list(reversed(records[-20:]))
+            # 取最近 200 条（覆盖近期大部分预测，便于浏览与勾选投注候选）
+            recent = list(reversed(records[-200:]))
             self.prediction_select_table.setRowCount(0)
             for rec in recent:
                 row = self.prediction_select_table.rowCount()

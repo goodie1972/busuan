@@ -26,6 +26,9 @@ def check(name, cond, detail=""):
         print(f"  [FAIL] {name} {detail}")
 
 app = QApplication(sys.argv)
+# 真实数据文件基线快照: UI操作不应触碰这些文件(结束时对比)
+_BASE_PRED = len(json.load(open('prediction_history.json', encoding='utf-8')))
+_BASE_INV = len(json.load(open('investment_history.json', encoding='utf-8')))
 from lottery_predictor_app_new import LotteryPredictorApp
 win = LotteryPredictorApp()
 win.show()
@@ -249,8 +252,8 @@ if FAIL:
 # 验证真实数据文件未被触碰
 rec = json.load(open('prediction_history.json', encoding='utf-8'))
 inv = json.load(open('investment_history.json', encoding='utf-8'))
-check("prediction_history.json 仍274条", len(rec) == 274, f"actual={len(rec)}")
-check("investment_history.json 仍8条", len(inv) == 8, f"actual={len(inv)}")
+check(f"prediction_history.json 未被触碰(基线{_BASE_PRED}条)", len(rec) == _BASE_PRED, f"actual={len(rec)}")
+check(f"investment_history.json 未被触碰(基线{_BASE_INV}条)", len(inv) == _BASE_INV, f"actual={len(inv)}")
 print("=" * 50)
 print("RESULT:", "ALL PASS" if not FAIL else "HAS FAIL")
 sys.exit(0 if not FAIL else 1)

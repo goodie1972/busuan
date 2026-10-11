@@ -449,7 +449,12 @@ class AutoPredictThread(QThread):
                 else:
                     line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {blue[0]:02d}"
                 result_lines.append(line)
-                all_predictions.append((red, blue))
+                # 收集按号码对齐的概率列表（全类别字典在此转换，供校准使用）
+                rp = getattr(ml_model, 'last_red_proba', None)
+                bp = getattr(ml_model, 'last_blue_proba', None)
+                red_proba = ([float(rp.get(int(n) - 1, 0.0)) for n in red] if isinstance(rp, dict) else None)
+                blue_proba = ([float(bp.get(int(n) - 1, 0.0)) for n in blue] if isinstance(bp, dict) else None)
+                all_predictions.append((list(red), list(blue), red_proba, blue_proba))
 
             result_text = "\n".join(result_lines)
             self.log_signal.emit("预测生成完成。")
