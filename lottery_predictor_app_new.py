@@ -893,18 +893,25 @@ class LotteryPredictorApp(QMainWindow):
             from prediction_records import add_prediction_record
             count = None
             for prediction in predictions:
-                # 处理新旧两种格式：(red, blue) 或 (red, blue, red_proba, blue_proba)
+                # 处理新旧/多来源两种格式：
+                #   2元组 (red, blue) + 函数级全局概率字典（复式：所有组合共享一次概率排序）
+                #   4元组 (red, blue, red_proba, blue_proba)（单式/胆拖：每注各自携带概率字典）
                 if len(prediction) == 2:
                     red_nums, blue_nums = prediction
-                    red_proba = None
-                    blue_proba = None
+                    red_proba = red_probabilities
+                    blue_proba = blue_probabilities
                 elif len(prediction) == 4:
                     red_nums, blue_nums, red_proba, blue_proba = prediction
+                    # 每注未带概率时回退到全局字典（胆拖路径兼容）
+                    if red_proba is None:
+                        red_proba = red_probabilities
+                    if blue_proba is None:
+                        blue_proba = blue_probabilities
                 else:
                     # 后备方案，只取前两个元素
                     red_nums, blue_nums = prediction[0], prediction[1]
-                    red_proba = None
-                    blue_proba = None
+                    red_proba = red_probabilities
+                    blue_proba = blue_probabilities
 
                 # 模型概率输出为全类别概率字典 {号码-1: 概率}，在此转成
                 # 按号码对齐的概率列表（长度必须等于号码个数；否则校准收集

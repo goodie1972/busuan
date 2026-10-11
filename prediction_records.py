@@ -138,8 +138,14 @@ def verify_records(log_callback=None, records_subset=None):
         if lt not in dfs:
             continue  # 数据文件缺失，保持待核验
         df = dfs[lt]
+        # latest_period 必须可转成整数（防御脏数据，避免 int64 与 str 比较抛 TypeError 卡死全部核验）
+        try:
+            latest = int(rec['latest_period'])
+        except (KeyError, TypeError, ValueError):
+            continue  # 期号损坏，跳过该记录
+        rec['latest_period'] = latest
         # 目标期：第一个 期数 > latest_period 的开奖期
-        mask = df['期数'] > rec['latest_period']
+        mask = df['期数'] > latest
         if not mask.any():
             continue  # 还没开出新期，保持待核验
         target_idx = df.index[mask][0]
