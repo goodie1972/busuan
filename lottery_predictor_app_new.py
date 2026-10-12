@@ -270,13 +270,20 @@ class LotteryPredictorApp(QMainWindow):
          self.prediction_select_table, self.invest_multiplier_spin,
          self.investment_table, self.total_invested_label,
          self.total_won_label, self.net_profit_label,
-         self.roi_label, self.win_rate_label
+         self.roi_label, self.win_rate_label,
+         self.invest_sel_all_pred_btn, self.invest_clear_all_pred_btn,
+         self.invest_sel_all_rec_btn, self.invest_clear_all_rec_btn
         ) = create_investment_plan_tab_new(self.investment_tab)
         self.invest_load_btn.clicked.connect(self.load_predictions_for_investment)
         self.invest_confirm_btn.clicked.connect(self.confirm_investment_from_predictions)
         self.invest_verify_btn.clicked.connect(self.verify_investment_records)
         self.invest_export_btn.clicked.connect(self.export_investment_records)
         self.invest_clear_btn.clicked.connect(self.clear_investment_records)
+        # 全选/取消全选（第一步: 预测选择表复选框; 第二步: 投注记录表行选中）
+        self.invest_sel_all_pred_btn.clicked.connect(self.select_all_predictions)
+        self.invest_clear_all_pred_btn.clicked.connect(self.clear_all_predictions)
+        self.invest_sel_all_rec_btn.clicked.connect(self.select_all_investment_records)
+        self.invest_clear_all_rec_btn.clicked.connect(self.clear_all_investment_records)
         self.tab_widget.addTab(self.investment_tab, "投注计划")
 
         # ===== 模型优化标签页 =====
@@ -1301,6 +1308,39 @@ class LotteryPredictorApp(QMainWindow):
             self.log_emitter.new_log.emit(f"已加载 {len(recent)} 条最近预测记录")
         except Exception as e:
             self.log_emitter.new_log.emit(f"加载预测记录失败: {e}")
+
+    def select_all_predictions(self):
+        """全选预测选择表中的所有复选框"""
+        count = 0
+        for r in range(self.prediction_select_table.rowCount()):
+            cb = self.prediction_select_table.cellWidget(r, 0)
+            if cb is not None and not cb.isChecked():
+                cb.setChecked(True)
+                count += 1
+        self.log_emitter.new_log.emit(
+            f"已全选预测记录（共 {self.prediction_select_table.rowCount()} 条）")
+
+    def clear_all_predictions(self):
+        """取消预测选择表中的所有勾选"""
+        for r in range(self.prediction_select_table.rowCount()):
+            cb = self.prediction_select_table.cellWidget(r, 0)
+            if cb is not None and cb.isChecked():
+                cb.setChecked(False)
+        self.log_emitter.new_log.emit("已取消全选预测记录")
+
+    def select_all_investment_records(self):
+        """全选投注记录表（供“核验选中”使用）"""
+        total = self.investment_table.rowCount()
+        if total == 0:
+            QMessageBox.information(self, "提示", "当前没有投注记录")
+            return
+        self.investment_table.selectAll()
+        self.log_emitter.new_log.emit(f"已全选投注记录（共 {total} 条）")
+
+    def clear_all_investment_records(self):
+        """取消投注记录表的选中（不删除记录）"""
+        self.investment_table.clearSelection()
+        self.log_emitter.new_log.emit("已取消选中投注记录")
 
     def confirm_investment_from_predictions(self):
         """从预测记录确认投注"""

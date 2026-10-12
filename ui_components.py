@@ -1543,7 +1543,9 @@ def create_investment_plan_tab_new(investment_tab):
                 export_btn, clear_btn, prediction_select_table,
                 multiplier_spin, investment_table,
                 total_invested_label, total_won_label, net_profit_label,
-                roi_label, win_rate_label)
+                roi_label, win_rate_label,
+                select_all_pred_btn, clear_all_pred_btn,
+                select_all_invest_btn, clear_all_invest_btn)
     """
     layout = QVBoxLayout(investment_tab)
     layout.setSpacing(6)
@@ -1558,6 +1560,15 @@ def create_investment_plan_tab_new(investment_tab):
     load_predictions_btn.setMinimumHeight(32)
     load_predictions_btn.setStyleSheet("font-size: 11pt;")
     pred_btn_row.addWidget(load_predictions_btn)
+    # 预测选择表的全选/取消全选（操作每行的复选框）
+    select_all_pred_btn = QPushButton("全选")
+    select_all_pred_btn.setMinimumHeight(32)
+    select_all_pred_btn.setStyleSheet("font-size: 11pt;")
+    pred_btn_row.addWidget(select_all_pred_btn)
+    clear_all_pred_btn = QPushButton("取消全选")
+    clear_all_pred_btn.setMinimumHeight(32)
+    clear_all_pred_btn.setStyleSheet("font-size: 11pt;")
+    pred_btn_row.addWidget(clear_all_pred_btn)
     pred_btn_row.addStretch()
 
     pred_layout_row2 = QHBoxLayout()
@@ -1597,6 +1608,15 @@ def create_investment_plan_tab_new(investment_tab):
     verify_btn.setMinimumHeight(32)
     verify_btn.setStyleSheet("font-size: 11pt;")
     invest_btn_row.addWidget(verify_btn)
+    # 投注记录表的全选/取消全选（表格行选中，配合“核验选中”）
+    select_all_invest_btn = QPushButton("全选")
+    select_all_invest_btn.setMinimumHeight(32)
+    select_all_invest_btn.setStyleSheet("font-size: 11pt;")
+    invest_btn_row.addWidget(select_all_invest_btn)
+    clear_all_invest_btn = QPushButton("取消全选")
+    clear_all_invest_btn.setMinimumHeight(32)
+    clear_all_invest_btn.setStyleSheet("font-size: 11pt;")
+    invest_btn_row.addWidget(clear_all_invest_btn)
     export_btn = QPushButton("导出CSV")
     export_btn.setMinimumHeight(32)
     export_btn.setStyleSheet("font-size: 11pt;")
@@ -1616,6 +1636,7 @@ def create_investment_plan_tab_new(investment_tab):
     ])
     investment_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
     investment_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    investment_table.setSelectionMode(QAbstractItemView.ExtendedSelection)  # 支持多选/全选，便于批量核验
     investment_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
     investment_table.setMinimumHeight(180)
     invest_layout.addWidget(investment_table)
@@ -1638,7 +1659,9 @@ def create_investment_plan_tab_new(investment_tab):
             export_btn, clear_btn, prediction_select_table,
             multiplier_spin, investment_table,
             total_invested_label, total_won_label, net_profit_label,
-            roi_label, win_rate_label)
+            roi_label, win_rate_label,
+            select_all_pred_btn, clear_all_pred_btn,
+            select_all_invest_btn, clear_all_invest_btn)
 
 
 def create_optimization_tab(optimization_tab):

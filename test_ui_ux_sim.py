@@ -105,7 +105,9 @@ walk("预测记录", ['rec_refresh_btn', 'rec_verify_btn', 'rec_verify_all_btn',
                  'rec_stats_label'], tab_idx=7)
 walk("投注计划", ['invest_load_btn', 'invest_confirm_btn', 'invest_verify_btn',
                  'invest_export_btn', 'invest_clear_btn', 'prediction_select_table',
-                 'investment_table', 'total_invested_label', 'roi_label', 'win_rate_label'], tab_idx=8)
+                 'investment_table', 'total_invested_label', 'roi_label', 'win_rate_label',
+                 'invest_sel_all_pred_btn', 'invest_clear_all_pred_btn',
+                 'invest_sel_all_rec_btn', 'invest_clear_all_rec_btn'], tab_idx=8)
 walk("模型优化", ['opt_lottery_combo', 'opt_feat_table', 'opt_top_k_spin',
                  'opt_train_calib_btn', 'opt_run_feat_btn', 'opt_log_box'], tab_idx=9)
 # 表格列头
@@ -194,6 +196,35 @@ n_sel = win.prediction_select_table.rowCount()
 check("投注计划: 加载最近预测到选择表", n_sel >= 1, f"rows={n_sel}")
 # 统计标签初始态可见
 check("投注计划: ROI/胜率标签存在", win.roi_label is not None and win.win_rate_label is not None)
+
+# 3f-2. 预测选择表: 全选/取消全选(复选框)
+win.invest_sel_all_pred_btn.click(); pump(120)
+checked = sum(1 for r in range(win.prediction_select_table.rowCount())
+              if win.prediction_select_table.cellWidget(r, 0).isChecked())
+check("投注计划: 全选预测→全部勾选", checked == n_sel and n_sel >= 1,
+      f"checked={checked}/{n_sel}")
+win.invest_clear_all_pred_btn.click(); pump(120)
+checked = sum(1 for r in range(win.prediction_select_table.rowCount())
+              if win.prediction_select_table.cellWidget(r, 0).isChecked())
+check("投注计划: 取消全选→全部未勾选", checked == 0, f"checked={checked}")
+# 勾一行→确认投注(写沙盒)→投注记录表有行, 验证第二步全选
+first_cb = win.prediction_select_table.cellWidget(0, 0)
+if first_cb:
+    first_cb.setChecked(True)
+    rows_before = win.investment_table.rowCount()
+    win.invest_confirm_btn.click(); pump(200)
+    check("投注计划: 确认投注后记录表+1行",
+          win.investment_table.rowCount() == rows_before + 1,
+          f"{rows_before}->{win.investment_table.rowCount()}")
+    # 第二步: 投注记录表全选/取消全选
+    win.invest_sel_all_rec_btn.click(); pump(120)
+    sel_rows = set(i.row() for i in win.investment_table.selectedItems())
+    check("投注计划: 全选投注记录→选中全部行",
+          len(sel_rows) == win.investment_table.rowCount(),
+          f"sel={len(sel_rows)}/{win.investment_table.rowCount()}")
+    win.invest_clear_all_rec_btn.click(); pump(120)
+    check("投注计划: 取消选中→0选中行",
+          len(win.investment_table.selectedItems()) == 0)
 
 # 3g. 梅花易数: 直觉数字勾选联动启用3个数字框
 win.tab_widget.setCurrentIndex(6); pump(200)
