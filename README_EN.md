@@ -4,6 +4,15 @@ A sophisticated machine learning application for lottery number prediction. This
 
 ## Latest Updates
 
+### October 14, 2026 Update
+- New "Model Feedback Optimization" loop: prediction probability archiving → verification → calibration / dynamic weights / retraining
+- Enhanced feature mode: 21 time-series derived features (omission / rolling stats / repeat rate), auto-aligned train↔predict, legacy models unaffected (feature_mode persisted)
+- New forward-performance leaderboard: EWMA excess hits from verified records, softmax dynamic weights, recommended model shown in the "Model Optimization" tab
+- Ensemble probability averaging and voting now weight sub-models by dynamic weights (equal-weight fallback)
+- Feedback retraining rewritten to the real training path: recent-window retrain (anti-drift), enhanced features, optional LSTM-CRF; full GUI parameter pass-through
+- Calibration module (isotonic / Platt scaling) trained on predicted-probability vs actual-hit samples
+- Auto weight recalculation after verification; select-all buttons on prediction-record / betting-plan pages
+
 ### March 25, 2025 Update
 - Added dedicated tab for Expected Value Model with enhanced visualization of prediction steps
 - Improved model training process with better error handling and progress reporting

@@ -226,6 +226,12 @@ def create_main_tab(main_tab):
     row3.addWidget(theme_combo)
     row3.addWidget(customize_theme_button)
     row3.addWidget(gpu_checkbox)
+    # 增强特征复选框（仅对sklearn类ML模型生效；勾选后训练+21个时序衍生特征，预测自动跟随）
+    enhanced_feature_checkbox = QCheckBox("增强特征")
+    enhanced_feature_checkbox.setStyleSheet(label_style)
+    enhanced_feature_checkbox.setChecked(False)  # 默认关闭=旧行为
+    enhanced_feature_checkbox.setToolTip("训练时加入21个时序衍生特征(遗漏值/滚动和值跨度/重号率)；\n预测自动跟随模型记录的标记，无需勾选。LSTM-CRF不支持。")
+    row3.addWidget(enhanced_feature_checkbox)
     # 自动重训策略复选框
     autoretrain_checkbox = QCheckBox("自动重训")
     autoretrain_checkbox.setStyleSheet(label_style)
@@ -314,7 +320,8 @@ def create_main_tab(main_tab):
             theme_combo, customize_theme_button, model_combo,
             mode_combo, compound_red_spin, compound_blue_spin,
             dt_red_dan, dt_red_tuo, dt_blue_dan, dt_blue_tuo,
-            auto_predict_button, compare_button, autoretrain_checkbox)
+            auto_predict_button, compare_button, autoretrain_checkbox,
+            enhanced_feature_checkbox)
 
 
 def create_analysis_tab(analysis_tab):
@@ -1778,7 +1785,44 @@ def create_optimization_tab(optimization_tab):
     feature_group.setStyleSheet(card_style)
     layout.addWidget(feature_group)
 
-    # ==================== 3. 反馈重训练区 ====================
+    # ==================== 3. 模型前向表现与动态权重区 ====================
+    weights_group = QGroupBox("🏆 模型前向表现与动态权重 (由已核验预测记录计算)")
+    weights_layout = QVBoxLayout(weights_group)
+
+    weights_info_row = QHBoxLayout()
+    recommended_label = QLabel("推荐模型: -")
+    recommended_label.setStyleSheet(label_style + " font-weight: bold; color: #2B579A;")
+    weights_update_label = QLabel("更新时间: -")
+    weights_update_label.setStyleSheet(label_style)
+    weights_info_row.addWidget(recommended_label)
+    weights_info_row.addSpacing(30)
+    weights_info_row.addWidget(weights_update_label)
+    weights_info_row.addStretch()
+    weights_layout.addLayout(weights_info_row)
+
+    weights_btn_row = QHBoxLayout()
+    refresh_weights_btn = QPushButton("刷新表现榜")
+    refresh_weights_btn.setStyleSheet(btn_style)
+    weights_btn_row.addWidget(refresh_weights_btn)
+    recalc_weights_btn = QPushButton("重算权重")
+    recalc_weights_btn.setStyleSheet(btn_style)
+    recalc_weights_btn.setToolTip("用当前全部已核验记录重新计算EWMA权重(核验后会自动重算，此处手动触发)")
+    weights_btn_row.addWidget(recalc_weights_btn)
+    weights_btn_row.addStretch()
+    weights_layout.addLayout(weights_btn_row)
+
+    weights_table = QTableWidget()
+    weights_table.setColumnCount(7)
+    weights_table.setHorizontalHeaderLabels(["模型", "样本注数", "红球均命中", "中奖率", "EWMA超额", "集成权重", "状态"])
+    weights_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    weights_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    weights_table.setMaximumHeight(130)
+    weights_layout.addWidget(weights_table)
+
+    weights_group.setStyleSheet(card_style)
+    layout.addWidget(weights_group)
+
+    # ==================== 4. 反馈重训练区 ====================
     retrain_group = QGroupBox("🔄 反馈重训练 (综合优化)")
     retrain_layout = QVBoxLayout(retrain_group)
 
@@ -1793,6 +1837,22 @@ def create_optimization_tab(optimization_tab):
     retrain_config_row.addWidget(QLabel("使用GPU:"))
     use_gpu_check = QCheckBox("启用GPU训练")
     retrain_config_row.addWidget(use_gpu_check)
+    retrain_config_row.addSpacing(14)
+    retrain_config_row.addWidget(QLabel("近窗(期):"))
+    recent_spin = QSpinBox()
+    recent_spin.setRange(0, 2000)
+    recent_spin.setValue(0)
+    recent_spin.setSpecialValueText("全量")
+    recent_spin.setToolTip("抗漂移: 仅用最近N期数据重训(0=全量)；增强模式下暖机50期自动保留")
+    recent_spin.setStyleSheet(spin_style)
+    retrain_config_row.addWidget(recent_spin)
+    retrain_config_row.addSpacing(14)
+    enhanced_retrain_check = QCheckBox("增强特征")
+    enhanced_retrain_check.setToolTip("训练+21个时序衍生特征(遗漏/滚动统计/重号率)；预测自动跟随模型标记")
+    retrain_config_row.addWidget(enhanced_retrain_check)
+    lstm_retrain_check = QCheckBox("含LSTM-CRF")
+    lstm_retrain_check.setToolTip("同时重训 LSTM-CRF，耗时约2小时，默认跳过")
+    retrain_config_row.addWidget(lstm_retrain_check)
     retrain_config_row.addSpacing(20)
     retrain_config_row.addWidget(QLabel("模型选择:"))
     model_multi_edit = QLineEdit()
@@ -1831,7 +1891,10 @@ def create_optimization_tab(optimization_tab):
             calib_table,
             top_k_spin, drift_window_spin,
             run_feat_btn, refresh_feat_btn, drift_check_btn, feat_table,
-            use_gpu_check, model_multi_edit,
+            refresh_weights_btn, recalc_weights_btn,
+            recommended_label, weights_update_label, weights_table,
+            use_gpu_check, recent_spin, enhanced_retrain_check, lstm_retrain_check,
+            model_multi_edit,
             retrain_one_btn, retrain_all_btn, retrain_status_label,
             opt_log_box)
 

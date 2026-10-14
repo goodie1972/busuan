@@ -32,7 +32,7 @@ def test_save_prediction_records():
                     if not predictions:
                         return
                     # 使用真实的 load_lottery_data 函数
-                    from prediction_utils import load_lottery_data
+                    from scripts.data_analysis import load_lottery_data
                     df = load_lottery_data(lottery_type)
                     if df is None or df.empty:
                         # 如果没有数据，使用一个最小的数据框以便测试
@@ -70,9 +70,13 @@ def test_save_prediction_records():
         
         app = MockApp()
         
-        # 清除旧的预测记录以便测试
+        # 沙盒隔离: 重定向记录文件到临时目录，绝不触碰真实 prediction_history.json
+        import tempfile, os as _os
         from prediction_records import save_records
-        save_records([])  # 清空记录
+        import prediction_records as _pr
+        _sandbox = tempfile.mkdtemp(prefix='integ_')
+        _pr.HISTORY_FILE = _os.path.join(_sandbox, 'ph.json')
+        save_records([])  # 清空的是沙盒记录
         
         # 测试1: 简单预测（无概率）
         print("  测试1: 简单预测（无概率）...")

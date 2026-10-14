@@ -30,11 +30,12 @@ class TrainModelThread(QThread):
     finished_signal = pyqtSignal()
     pause_signal = pyqtSignal(bool)
     
-    def __init__(self, lottery_type, use_gpu=False, model_type='lstm-crf'):
+    def __init__(self, lottery_type, use_gpu=False, model_type='lstm-crf', feature_mode='original'):
         super().__init__()
         self.lottery_type = lottery_type
         self.use_gpu = use_gpu
         self.model_type = model_type
+        self.feature_mode = feature_mode  # original=70维位图 / enhanced=+21时序衍生特征
         self.is_paused = False
         self.should_terminate = False
         
@@ -170,6 +171,10 @@ class TrainModelThread(QThread):
                 log_callback=enhanced_log,  
                 use_gpu=self.use_gpu 
             )
+            # 增强特征模式（由训练入口勾选；默认original与旧行为一致）
+            if getattr(self, 'feature_mode', 'original') == 'enhanced':
+                ml_model.feature_mode = 'enhanced'
+                self.log_signal.emit("已启用增强特征模式(+21个时序衍生特征)")
             
      
             self.log_signal.emit("准备训练数据...")
@@ -702,12 +707,16 @@ class RetrainThread(QThread):
     log_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool)
 
-    def __init__(self, lottery_type=None, use_gpu=False, model_types=None, retrain_all=False):
+    def __init__(self, lottery_type=None, use_gpu=False, model_types=None, retrain_all=False,
+                 recent_periods=None, feature_mode='original', include_lstm=False):
         super().__init__()
         self.lottery_type = lottery_type
         self.use_gpu = use_gpu
         self.model_types = model_types
         self.retrain_all = retrain_all
+        self.recent_periods = recent_periods
+        self.feature_mode = feature_mode
+        self.include_lstm = include_lstm
         self.should_terminate = False
 
     def run(self):
@@ -716,8 +725,9 @@ class RetrainThread(QThread):
 
             if self.retrain_all:
                 self.log_signal.emit("开始重训练全部彩票模型...")
-                # retrain_all_lotteries 只接受 use_gpu，返回 {lottery: bool}
-                results = retrain_all_lotteries(use_gpu=self.use_gpu)
+                results = retrain_all_lotteries(
+                    use_gpu=self.use_gpu, recent_periods=self.recent_periods,
+                    feature_mode=self.feature_mode, include_lstm=self.include_lstm)
                 all_ok = all(results.values()) if results else False
                 for lt, ok in results.items():
                     self.log_signal.emit(f"  {lt.upper()}: {'成功' if ok else '失败'}")
@@ -728,7 +738,10 @@ class RetrainThread(QThread):
                 success = retrain_lottery_models(
                     lottery_type=self.lottery_type,
                     use_gpu=self.use_gpu,
-                    model_types=self.model_types
+                    model_types=self.model_types,
+                    recent_periods=self.recent_periods,
+                    feature_mode=self.feature_mode,
+                    include_lstm=self.include_lstm
                 )
                 self.log_signal.emit(f"{self.lottery_type} 重训练{'完成' if success else '失败'}")
                 self.finished_signal.emit(success)

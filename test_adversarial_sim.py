@@ -246,11 +246,15 @@ print("=" * 60)
 print("阶段4: 核验对抗 (subset/未开奖/重复调用/全量回归)")
 print("=" * 60)
 from prediction_records import verify_records, load_records, save_records
+from backtest import _load_csv_data
+# 动态哨兵: KNOWN=双色球已开奖期(两彩种都必然存在目标期), PENDING=两彩种最大值+1(必然未开)
+_mx = max(int(_load_csv_data('dlt')['期数'].max()), int(_load_csv_data('ssq')['期数'].max()))
+PENDING_LATEST = _mx + 1
 all_recs = load_records()
 # 把沙盒记录的 latest_period 设为 26108(已开奖), 目标期 26109/26110 已开
 latest_known = 26108
 for r in all_recs:
-    if r.get('latest_period') in (26115, 26116):
+    if int(r.get('latest_period') or 0) >= _mx - 1:
         r['latest_period'] = latest_known
 save_records(all_recs)
 check("沙盒记录最新期已调整为26108", all(r.get('latest_period') == latest_known for r in load_records()))
@@ -259,7 +263,7 @@ check("沙盒记录最新期已调整为26108", all(r.get('latest_period') == la
 recs = load_records()
 n = min(10, len(recs))
 for i in range(n):
-    recs[i]['latest_period'] = 26115
+    recs[i]['latest_period'] = PENDING_LATEST
 save_records(recs)
 verify_records(log_callback=lambda m: None, records_subset=list(range(n)))
 recs = load_records()
@@ -291,7 +295,7 @@ verify_records(log_callback=lambda m: None)
 recs = load_records()
 still_pending = [r for r in recs if r['target_period'] is None]
 check("全量核验: 仅剩未开奖的保持待核验",
-      all(r['latest_period'] == 26115 for r in still_pending),
+      all(r['latest_period'] == PENDING_LATEST for r in still_pending),
       f"pending={len(still_pending)}")
 
 # 4e. GUI 路径: 表格"核验选中"(不选行=全部) + (选中2行=只核验2行)
@@ -312,7 +316,7 @@ win.rec_verify_btn.click()
 pump(400)
 recs = load_records()
 check("GUI核验(无选中): 全部可核验的都核验了",
-      all(r['target_period'] is not None for r in recs if r['latest_period'] != 26115))
+      all(r['target_period'] is not None for r in recs if r['latest_period'] != PENDING_LATEST))
 # 选中表格第0、1行(多选模式叠加选择), 再点核验 → 日志应出现"核验选中 2 条"
 from PyQt5.QtCore import QItemSelectionModel, QItemSelection
 tbl = win.records_table
@@ -339,7 +343,7 @@ win.refresh_prediction_records(); pump(200)
 win.rec_verify_all_btn.click(); pump(400)
 recs = load_records()
 check("全部核验按钮: 新制造待核验被核验",
-      all(r['target_period'] is not None for r in recs if r['latest_period'] != 26115))
+      all(r['target_period'] is not None for r in recs if r['latest_period'] != PENDING_LATEST))
 
 print()
 print("=" * 60)

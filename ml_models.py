@@ -60,6 +60,86 @@ if CATBOOST_AVAILABLE:
 if EXPECTED_VALUE_MODEL_AVAILABLE:
     MODEL_TYPES['expected_value'] = '期望值模型'
 
+
+def _augment_features_frame(df, lottery_type, red_cols, blue_cols, window=50):
+    """为期数升序的完整历史DataFrame追加时序衍生特征列（增强特征模式）。
+
+    衍生特征（每行只用当期及之前数据，无未来泄漏）：
+      - miss_<号码列>: 该槽位号码开出前已连续遗漏的期数（截断到miss_cut）
+      - {sum,span,odd,big}_rmean/_rstd: 和值/跨度/奇数比/大号比 的前window期
+        滚动均值与标准差（shift(1)不含当期自身）
+      - {dup1,dup3,dup7}_rmean/_rstd: 红球与上1/3/7期重号率的滚动统计
+    训练端(prepare_data)与预测端(predict/_rank_balls)必须同时启用保持列一致；
+    增强模式要求历史长度 > window+feature_window。旧模型（model_info无
+    feature_mode标记）预测不走此函数，行为与升级前完全一致。
+
+    Args:
+        df: 按'期数'升序的完整历史 DataFrame
+        lottery_type: 'ssq' 或 'dlt'
+        red_cols / blue_cols: 号码列名列表（按序）
+        window: 滚动窗口长度
+
+    Returns:
+        (DataFrame副本, 新增列名列表)
+    """
+    out = df.copy().reset_index(drop=True)
+    is_dlt = (lottery_type == 'dlt')
+    big = 25 if is_dlt else 18          # 大号分界（DLT>=25, SSQ>=18）
+    miss_cut = 30 if is_dlt else 28     # 遗漏截断上限
+    n = len(out)
+    new_cols = []
+
+    # --- 遗漏值列：每个号码槽位一列，O(n) 单遍扫描 ---
+    for c in list(red_cols) + list(blue_cols):
+        vals = out[c].to_numpy(dtype=int)
+        miss = np.empty(n, dtype=float)
+        last_seen = {}
+        for i, v in enumerate(vals):
+            prev = last_seen.get(v, -1)
+            miss[i] = float(i - prev - 1) if prev >= 0 else float(i)
+            last_seen[v] = i
+        col_name = f'miss_{c}'
+        out[col_name] = np.minimum(miss, float(miss_cut))
+        new_cols.append(col_name)
+
+    # --- 每行聚合统计（向量化）---
+    red_arr = out[list(red_cols)].to_numpy(dtype=int)
+    sum_v = red_arr.sum(axis=1).astype(float)
+    span_v = (red_arr.max(axis=1) - red_arr.min(axis=1)).astype(float)
+    odd_v = (red_arr % 2 == 1).mean(axis=1)
+    big_v = (red_arr >= big).mean(axis=1)
+    # 重号动量：本期红球在上1/3/7期(不含本期)出现过的比例
+    row_sets = [set(int(x) for x in row) for row in red_arr]
+    dup1 = np.zeros(n)
+    dup3 = np.zeros(n)
+    dup7 = np.zeros(n)
+    for i in range(1, n):
+        cur = row_sets[i]
+        if not cur:
+            continue
+        dup1[i] = len(cur & row_sets[i - 1]) / len(cur)
+        if i >= 3:
+            s3 = set().union(*row_sets[i - 3:i])
+            dup3[i] = len(cur & s3) / len(cur)
+        if i >= 7:
+            s7 = set().union(*row_sets[i - 7:i])
+            dup7[i] = len(cur & s7) / len(cur)
+    stats = {'sum': sum_v, 'span': span_v, 'odd': odd_v, 'big': big_v,
+             'dup1': dup1, 'dup3': dup3, 'dup7': dup7}
+
+    # --- 滚动统计列（shift(1)：只用之前window期，不含当期）---
+    for key, vals_s in stats.items():
+        s = pd.Series(vals_s, dtype=float)
+        rm = s.rolling(window, min_periods=window).mean().shift(1)
+        rs = s.rolling(window, min_periods=window).std().shift(1)
+        rstd_fill = float(rs.median()) if bool(rs.notna().any()) else 0.0
+        out[key + '_rmean'] = rm.fillna(float(s.mean()))
+        out[key + '_rstd'] = rs.fillna(rstd_fill)
+        new_cols += [key + '_rmean', key + '_rstd']
+
+    return out, new_cols
+
+
 class WrappedXGBoostModel:
     def __init__(self, model, processor):
         self.model = model
@@ -176,22 +256,33 @@ def _class_proba_dict(model, X_scaled):
     return None
 
 
-def _ensemble_proba_dict(models_dict, X_scaled):
-    """集成模型：对每个子模型取逐类概率并平均，返回 {类别索引: 平均概率}"""
+def _ensemble_proba_dict(models_dict, X_scaled, weights=None):
+    """集成模型：对每个子模型取逐类概率并(加权)平均，返回 {类别索引: 平均概率}
+
+    weights: 可选 {子模型名: 权重}，由 model_weights 模块基于前向核验表现计算；
+    缺省或子模型名不在表中时按等权(1.0)，与旧行为一致。
+    """
     sums = None
-    count = 0
-    for model in models_dict.values():
+    total_w = 0.0
+    for name, model in models_dict.items():
         d = _class_proba_dict(model, X_scaled)
-        if d:
-            if sums is None:
-                sums = dict(d)
-            else:
-                for k, v in d.items():
-                    sums[k] = sums.get(k, 0.0) + v
-            count += 1
-    if sums is None or count == 0:
+        if not d:
+            continue
+        w = 1.0
+        if weights:
+            try:
+                w = float(weights.get(name, 1.0)) or 1.0
+            except (TypeError, ValueError):
+                w = 1.0
+        if sums is None:
+            sums = {k: v * w for k, v in d.items()}
+        else:
+            for k, v in d.items():
+                sums[k] = sums.get(k, 0.0) + v * w
+        total_w += w
+    if sums is None or total_w <= 0:
         return None
-    return {k: v / count for k, v in sums.items()}
+    return {k: v / total_w for k, v in sums.items()}
 
 
 def _mean_confidence(proba_map, numbers):
@@ -221,6 +312,13 @@ class LotteryMLModels:
         self.feature_window = feature_window
         self.models = {}
         self.scalers = {}
+        # 集成子模型动态权重（来自 model_weights 模块，按前向核验表现计算）
+        # 默认空表=等权，与旧行为完全一致；load_models 成功后刷新
+        self.sub_weights = {}
+        # 特征模式: original=70维bitmap(旧行为, 与升级前模型完全兼容)
+        # enhanced=+21维时序衍生特征(遗漏/滚动和值跨度/重号率)，需配套重训
+        self.feature_mode = 'original'
+        self.aug_feature_names = []
         self.feature_cols = []
         self.log_callback = log_callback
         self.use_gpu = use_gpu
@@ -268,6 +366,22 @@ class LotteryMLModels:
         if self.log_callback:
             self.log_callback(message)
     
+    def _load_full_history(self, df):
+        """增强模式训练入口的完整历史保障：
+        调用方传的可能只是尾部窗口切片，若行数不足以暖机(<=200)则从本地CSV补全。
+        已足够时原样返回，不重复IO。"""
+        try:
+            if df is not None and len(df) > 200:
+                return df
+            from backtest import _load_csv_data
+            full = _load_csv_data(self.lottery_type)
+            if full is not None and len(full) > 200:
+                self.log(f"增强模式: 训练切片仅{0 if df is None else len(df)}期，已改用完整历史 {len(full)} 期")
+                return full
+        except Exception as e:
+            self.log(f"增强模式补全历史失败(用原数据): {e}")
+        return df
+
     def prepare_data(self, df, test_size=0.2):
         """准备训练数据"""
     
@@ -278,6 +392,30 @@ class LotteryMLModels:
         
    
         df = df.sort_values('期数').reset_index(drop=True)
+
+        # 增强特征模式：在完整历史上追加时序衍生列并纳入特征；暖机不足自动回退
+        if self.feature_mode == 'enhanced':
+            _nred = 6 if self.lottery_type == 'ssq' else 5
+            _red0 = [c for c in df.columns if c.startswith('红球_')][:_nred]
+            _blue0 = [c for c in df.columns if c.startswith('蓝球_')][:self.blue_count]
+            if not _blue0:
+                _blue0 = [c for c in df.columns if c == '蓝球'][:1]
+            try:
+                df, _new_aug = _augment_features_frame(df, self.lottery_type,
+                                                       _red0, _blue0, window=50)
+            except Exception as _e:
+                self.log(f"增强特征计算失败，回退 original 模式: {_e}")
+                df, _new_aug = df.sort_values('期数').reset_index(drop=True), []
+                self.feature_mode = 'original'
+            if _new_aug and len(df) > 50 + self.feature_window:
+                self.aug_feature_names = list(_new_aug)
+                df = df.iloc[50:].reset_index(drop=True)
+                self.log(f"增强特征模式: 新增 {len(_new_aug)} 列，暖机丢弃最早50期，剩 {len(df)} 期")
+            elif _new_aug:
+                self.log(f"警告: 历史({len(df)}期)不足以启用增强特征，回退 original 模式")
+                df = df.drop(columns=_new_aug)
+                self.feature_mode = 'original'
+                self.aug_feature_names = []
         
    
         if self.lottery_type == 'dlt':
@@ -294,6 +432,11 @@ class LotteryMLModels:
                         break
         
         self.feature_cols = red_cols + blue_cols
+        # 增强模式：把衍生列接在末尾（训练/预测两侧拼接顺序必须一致）
+        _aug_in_df = []
+        if self.feature_mode == 'enhanced' and self.aug_feature_names:
+            _aug_in_df = [c for c in self.aug_feature_names if c in df.columns]
+            self.feature_cols = self.feature_cols + _aug_in_df
         
      
         X_data = []
@@ -305,7 +448,7 @@ class LotteryMLModels:
             features = []
             for j in range(window_size):
                 row_features = []
-                for col in red_cols + blue_cols:
+                for col in red_cols + blue_cols + _aug_in_df:
                     row_features.append(df.iloc[i + j][col])
                 features.append(row_features)
             
@@ -839,6 +982,9 @@ class LotteryMLModels:
             return self.models
         
         self.log("\n====== 第1阶段: 数据准备 ======")
+        # 增强特征模式需完整历史（重算遗漏/滚动统计）；original 模式零改变
+        if self.feature_mode == 'enhanced':
+            df = self._load_full_history(df)
         data_prep_start = time.time()
         X_train, X_test, y_red_train, y_red_test, y_blue_train, y_blue_test = self.prepare_data(df)
         data_prep_time = time.time() - data_prep_start
@@ -894,7 +1040,10 @@ class LotteryMLModels:
         self.save_models()
         save_time = time.time() - save_start
         self.log(f"模型保存完成，耗时: {save_time:.2f}秒")
-        
+
+        # 训练后刷新动态权重（ensemble 立即具备加权投票能力，与 load_models 行为一致）
+        self._refresh_sub_weights()
+
         total_time = time.time() - training_start_time
         self.log(f"\n训练完成，总耗时: {total_time:.2f}秒")
         
@@ -1164,6 +1313,8 @@ class LotteryMLModels:
         }
         
         # 添加特征数量信息
+        model_info['feature_mode'] = getattr(self, 'feature_mode', 'original')
+        model_info['aug_feature_names'] = list(getattr(self, 'aug_feature_names', []))
         expected_feature_count = getattr(self, 'expected_feature_count', None)
         if expected_feature_count:
             model_info['expected_feature_count'] = expected_feature_count
@@ -1267,7 +1418,13 @@ class LotteryMLModels:
                 
             self.feature_window = model_info.get('feature_window', self.feature_window)
             self.log(f"模型信息: 类型={model_info.get('model_type')}, 创建时间={model_info.get('created_at')}")
-            
+
+            # 恢复特征模式（旧模型无此字段=original，行为与升级前完全一致）
+            self.feature_mode = model_info.get('feature_mode', 'original')
+            self.aug_feature_names = list(model_info.get('aug_feature_names', []))
+            if self.feature_mode == 'enhanced':
+                self.log(f"模型为增强特征模式({len(self.aug_feature_names)}个衍生列)")
+
             # 加载特征数量信息
             if 'expected_feature_count' in model_info:
                 self.expected_feature_count = model_info['expected_feature_count']
@@ -1426,18 +1583,35 @@ class LotteryMLModels:
         # 如果所有模型都成功加载，返回True
         if models_loaded:
             self.log(f"{MODEL_TYPES[self.model_type]}模型加载成功")
+            self._refresh_sub_weights()
             return True
         elif balls_loaded >= 2:  # 至少加载了红球和蓝球
             # 即使有警告，只要基础模型存在，我们也认为模型可用
             self.log(f"{MODEL_TYPES[self.model_type]}模型加载成功，但有一些警告")
+            self._refresh_sub_weights()
             return True
         elif 'red' in self.models and 'blue' in self.models:
             # 模型存在但可能有其他问题
             self.log(f"{MODEL_TYPES[self.model_type]}模型加载成功，但可能存在兼容性问题")
+            self._refresh_sub_weights()
             return True
         else:
             self.log(f"{MODEL_TYPES[self.model_type]}模型加载失败，未找到必要的红球和蓝球模型")
             return False
+
+    def _refresh_sub_weights(self):
+        """从 model_weights 模块加载本彩种的子模型动态权重。
+        无权重文件/异常时保持空表（等权，旧行为）。"""
+        try:
+            from model_weights import get_model_weights
+            self.sub_weights = get_model_weights(self.lottery_type)
+            if self.sub_weights and self.model_type == 'ensemble':
+                named = [n for n in self.models.get('red', {}) if n in self.sub_weights]
+                if named:
+                    self.log("集成子模型已启用动态权重: " +
+                             ", ".join(f"{n}={self.sub_weights[n]:.2f}" for n in named))
+        except Exception:
+            self.sub_weights = {}
         
     def predict(self, recent_data, variation=0):
         """
@@ -1557,6 +1731,15 @@ class LotteryMLModels:
         
         # 创建特征序列
         X_data = []
+
+        # 增强特征模式：拼接衍生特征（与训练侧列序一致）
+        aug_mat = None
+        if getattr(self, 'feature_mode', 'original') == 'enhanced':
+            aug_mat = self._aug_row_features(recent_data)
+            if aug_mat is None:
+                # 增强模型缺衍生列时填零预测=伪概率，必须硬失败
+                self.log("错误: 增强模型无法计算衍生特征(历史不足或期号对不齐)，本次预测中止")
+                return None, None
         
         # 使用滑动窗口创建序列数据
         features = []
@@ -1564,6 +1747,8 @@ class LotteryMLModels:
             row_features = []
             for col in red_cols + blue_cols:
                 row_features.append(recent_data.iloc[j][col])
+            if aug_mat is not None:
+                row_features.extend([float(x) for x in aug_mat[j]])
             features.append(row_features)
             
         X_data.append(features)
@@ -1651,7 +1836,10 @@ class LotteryMLModels:
                 # 集成模型：self.models['red'] 是各子模型的 dict（没有predict方法），
                 # 必须逐模型预测后投票，不能直接调用 self.models['red'].predict()
                 red_votes = {}
+                # 动态权重：前向核验表现好的子模型票权更高（无权重文件时等权）
+                _sw = getattr(self, 'sub_weights', None) or {}
                 for name, model in self.models['red'].items():
+                    _w = float(_sw.get(name, 1.0) or 1.0)
                     preds = model.predict(X_scaled)[0]
                     if hasattr(preds, "__iter__"):
                         for pred in preds:
@@ -1662,12 +1850,12 @@ class LotteryMLModels:
                                 pred = int(pred)
                             if pred not in red_votes:
                                 red_votes[pred] = 0
-                            red_votes[pred] += 1
+                            red_votes[pred] += _w
                     else:
                         # 单一预测值
                         if preds not in red_votes:
                             red_votes[preds] = 0
-                        red_votes[preds] += 1
+                        red_votes[preds] += _w
                 red_predictions = sorted(red_votes.items(), key=lambda x: x[1], reverse=True)[:self.red_count]
                 red_predictions = [int(p[0]) + 1 for p in red_predictions]  # +1 转回原始号码范围
             else:
@@ -1681,7 +1869,8 @@ class LotteryMLModels:
             # 计算红球置信度（所选红球号码的模型概率均值）
             try:
                 if self.model_type == 'ensemble':
-                    proba_map = _ensemble_proba_dict(self.models['red'], X_scaled)
+                    proba_map = _ensemble_proba_dict(self.models['red'], X_scaled,
+                                                     weights=getattr(self, 'sub_weights', None))
                 else:
                     proba_map = _class_proba_dict(self.models['red'], X_scaled)
                 self.last_red_conf = _mean_confidence(proba_map, red_predictions)
@@ -1694,7 +1883,9 @@ class LotteryMLModels:
             if self.model_type == 'ensemble':
                 # 集成模型：self.models['blue'] 是各子模型的 dict，逐模型预测后投票
                 blue_votes = {}
+                _sw_b = getattr(self, 'sub_weights', None) or {}
                 for name, model in self.models['blue'].items():
+                    _wb = float(_sw_b.get(name, 1.0) or 1.0)
                     preds = model.predict(X_scaled)[0]
                     if hasattr(preds, "__iter__"):
                         for pred in preds:
@@ -1705,12 +1896,12 @@ class LotteryMLModels:
                                 pred = int(pred)
                             if pred not in blue_votes:
                                 blue_votes[pred] = 0
-                            blue_votes[pred] += 1
+                            blue_votes[pred] += _wb
                     else:
                         # 单一预测值
                         if preds not in blue_votes:
                             blue_votes[preds] = 0
-                        blue_votes[preds] += 1
+                        blue_votes[preds] += _wb
                 
                 # 从得票前3的蓝球中随机选择，而不是总是选择得票最高的
                 top_blue_votes = sorted(blue_votes.items(), key=lambda x: x[1], reverse=True)
@@ -1748,7 +1939,8 @@ class LotteryMLModels:
             # 计算蓝球置信度（所选蓝球号码的模型概率均值）
             try:
                 if self.model_type == 'ensemble':
-                    proba_map = _ensemble_proba_dict(self.models['blue'], X_scaled)
+                    proba_map = _ensemble_proba_dict(self.models['blue'], X_scaled,
+                                                     weights=getattr(self, 'sub_weights', None))
                 else:
                     proba_map = _class_proba_dict(self.models['blue'], X_scaled)
                 self.last_blue_conf = _mean_confidence(proba_map, blue_predictions)
@@ -1824,6 +2016,49 @@ class LotteryMLModels:
             return None, None, None
         return result[0], result[1], getattr(self, 'last_confidence', None)
 
+    def _aug_row_features(self, recent_data):
+        """预测侧：在完整历史上重算衍生列，返回按 recent_data 期号对齐的衍生特征矩阵。
+
+        与训练侧 prepare_data 的增强分支严格对应：都在"按期数升序的完整历史"上调用
+        _augment_features_frame，因此同一期号得到的衍生值完全一致。
+
+        Args:
+            recent_data: 最近若干期数据（期数顺序不限）
+
+        Returns:
+            形状 (feature_window, len(aug_feature_names)) 的 ndarray；
+            无法计算时返回 None（调用方回退到 original 特征）
+        """
+        try:
+            nred = 6 if self.lottery_type == 'ssq' else 5
+            red_cols = [c for c in recent_data.columns if c.startswith('红球_')][:nred]
+            blue_cols = [c for c in recent_data.columns
+                         if c.startswith('蓝球_') or c == '蓝球'][:self.blue_count]
+            if len(red_cols) < nred or not blue_cols:
+                return None
+            rec = recent_data.sort_values('期数', ascending=True).reset_index(drop=True)
+            if len(rec) < self.feature_window:
+                return None
+            # 衍生特征需要 50+window 暖机历史：不足时从本地CSV补全（recent 本身足够则不重复IO）
+            hist = self._load_full_history(rec)
+            hist = hist.sort_values('期数', ascending=True).reset_index(drop=True)
+            aug_df, new_cols = _augment_features_frame(
+                hist, self.lottery_type, red_cols, blue_cols, window=50)
+            if not new_cols:
+                return None
+            cols = [c for c in self.aug_feature_names if c in aug_df.columns] \
+                if self.aug_feature_names else new_cols
+            # 按期号精确对齐取行（预测侧行序=期数降序，与 predict/_rank_balls 一致）
+            pos = {int(p): i for i, p in enumerate(aug_df['期数'])}
+            periods = rec['期数'].astype(int).tolist()[-self.feature_window:][::-1]
+            if any(p not in pos for p in periods):
+                return None
+            return np.array([aug_df[cols].iloc[pos[p]].to_numpy(dtype=float)
+                             for p in periods], dtype=float)
+        except Exception as e:
+            self.log(f"预测端衍生特征计算失败: {e}")
+            return None
+
     def _rank_balls(self, recent_data):
         """
         构建特征并按模型概率对全部号码排序（ensemble 取各子模型平均概率）。
@@ -1856,12 +2091,22 @@ class LotteryMLModels:
                 self.log(f"历史数据不足，需要至少 {self.feature_window} 期")
                 return None, None
 
+            # 增强特征模式：拼接衍生特征（与 predict 一致，失败硬中止防伪概率）
+            aug_mat = None
+            if getattr(self, 'feature_mode', 'original') == 'enhanced':
+                aug_mat = self._aug_row_features(recent_data)
+                if aug_mat is None:
+                    self.log("错误: 增强模型无法计算衍生特征，本次预测中止")
+                    return None, None
+
             # 滑动窗口创建序列特征
             features = []
             for j in range(self.feature_window):
                 row_features = []
                 for col in red_cols + blue_cols:
                     row_features.append(recent_data.iloc[j][col])
+                if aug_mat is not None:
+                    row_features.extend([float(x) for x in aug_mat[j]])
                 features.append(row_features)
             X = np.array([features])
             X_reshaped = X.reshape(X.shape[0], -1)
@@ -1877,8 +2122,10 @@ class LotteryMLModels:
 
             # ---- 获取全号码概率排序 ----
             if self.model_type == 'ensemble':
-                red_proba = _ensemble_proba_dict(self.models['red'], X_scaled)
-                blue_proba = _ensemble_proba_dict(self.models['blue'], X_scaled)
+                red_proba = _ensemble_proba_dict(self.models['red'], X_scaled,
+                                                 weights=getattr(self, 'sub_weights', None))
+                blue_proba = _ensemble_proba_dict(self.models['blue'], X_scaled,
+                                                  weights=getattr(self, 'sub_weights', None))
             else:
                 red_proba = _class_proba_dict(self.models['red'], X_scaled)
                 blue_proba = _class_proba_dict(self.models['blue'], X_scaled)

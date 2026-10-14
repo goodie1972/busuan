@@ -155,7 +155,8 @@ class LotteryPredictorApp(QMainWindow):
         self.theme_combo, self.customize_theme_button, self.model_combo, \
         self.mode_combo, self.compound_red_spin, self.compound_blue_spin, \
         self.dt_red_dan, self.dt_red_tuo, self.dt_blue_dan, self.dt_blue_tuo, \
-        self.auto_predict_button, self.compare_button, self.autoretrain_checkbox = create_main_tab(self.main_tab)
+        self.auto_predict_button, self.compare_button, self.autoretrain_checkbox, \
+        self.enhanced_feature_checkbox = create_main_tab(self.main_tab)
         
         # 连接信号和槽
         self.predict_button.clicked.connect(self.generate_prediction)
@@ -295,7 +296,10 @@ class LotteryPredictorApp(QMainWindow):
          self.opt_top_k_spin, self.opt_drift_window_spin,
          self.opt_run_feat_btn, self.opt_refresh_feat_btn, self.opt_drift_check_btn,
          self.opt_feat_table,
-         self.opt_use_gpu_check, self.opt_model_multi_edit,
+         self.opt_refresh_weights_btn, self.opt_recalc_weights_btn,
+         self.opt_recommended_label, self.opt_weights_update_label, self.opt_weights_table,
+         self.opt_use_gpu_check, self.opt_recent_spin, self.opt_enhanced_retrain_check, self.opt_lstm_retrain_check,
+         self.opt_model_multi_edit,
          self.opt_retrain_one_btn, self.opt_retrain_all_btn, self.opt_retrain_status_label,
          self.opt_log_box) = create_optimization_tab(self.optimization_tab)
 
@@ -307,6 +311,9 @@ class LotteryPredictorApp(QMainWindow):
         self.opt_run_feat_btn.clicked.connect(self.run_feature_analysis_ui)
         self.opt_refresh_feat_btn.clicked.connect(self.refresh_feature_list)
         self.opt_drift_check_btn.clicked.connect(self.check_feature_drift_ui)
+        # 连接前向表现权重信号槽
+        self.opt_refresh_weights_btn.clicked.connect(self.refresh_model_weights_ui)
+        self.opt_recalc_weights_btn.clicked.connect(self.recalc_model_weights_ui)
         # 连接重训练信号槽
         self.opt_retrain_one_btn.clicked.connect(self.retrain_current_lottery)
         self.opt_retrain_all_btn.clicked.connect(self.retrain_all_lotteries_ui)
@@ -603,12 +610,18 @@ class LotteryPredictorApp(QMainWindow):
         else:
             # 训练机器学习模型
             self.log_emitter.new_log.emit(f"开始训练{lottery_name}预测模型({MODEL_TYPES[model_type]})...")
-            
+
+            # 增强特征模式（勾选后训练+21个时序衍生特征；预测自动跟随模型标记）
+            feature_mode = 'enhanced' if self.enhanced_feature_checkbox.isChecked() else 'original'
+            if feature_mode == 'enhanced':
+                self.log_box.append("<font color='blue'>增强特征模式: +21个时序衍生特征(遗漏/滚动统计/重号率)</font>")
+
             # 创建训练线程并传递模型类型
             self.training_thread = TrainModelThread(
                 lottery_type=lottery_type, 
                 use_gpu=use_gpu,
-                model_type=model_type
+                model_type=model_type,
+                feature_mode=feature_mode
             )
             self.training_thread.log_signal.connect(self.update_log)
             self.training_thread.finished_signal.connect(self.on_train_finished)
@@ -1079,12 +1092,18 @@ class LotteryPredictorApp(QMainWindow):
             detail_label.setText("卦象: 待起卦")
     
     def toggle_autoretrain(self, state):
-        """切换自动重训策略"""
+        """切换自动重训策略(启用时立即刷新一次前向表现权重)"""
         self.autoretrain_enabled = (state == 2)  # Qt.Checked = 2
         status = "启用" if self.autoretrain_enabled else "禁用"
         self.log_emitter.new_log.emit(f"自动重训策略已{status}")
         if self.autoretrain_enabled:
             self.statusBar().showMessage("自动重训策略已启动，将监控回测表现", 3000)
+            try:
+                from model_weights import update_all_weights
+                update_all_weights()
+                self.log_emitter.new_log.emit("已按最新核验表现刷新模型动态权重")
+            except Exception as e:
+                self.log_emitter.new_log.emit(f"权重刷新失败: {e}")
         else:
             self.statusBar().showMessage("自动重训策略已停止", 3000)
     
@@ -1103,15 +1122,6 @@ class LotteryPredictorApp(QMainWindow):
         scrollbar = self.log_box.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
     
-    def toggle_autoretrain(self, state):
-        """切换自动重训策略"""
-        self.autoretrain_enabled = (state == 2)  # Qt.Checked = 2
-        status = "启用" if self.autoretrain_enabled else "禁用"
-        self.log_emitter.new_log.emit(f"自动重训策略已{status}")
-        if self.autoretrain_enabled:
-            self.statusBar().showMessage("自动重训策略已启动，将监控回测表现", 3000)
-        else:
-            self.statusBar().showMessage("自动重训策略已停止", 3000)
     
     # ===== 预测记录管理功能 =====
     def refresh_prediction_records(self):
@@ -1215,8 +1225,28 @@ class LotteryPredictorApp(QMainWindow):
                            records_subset=subset)
             self.refresh_prediction_records()
             self.log_emitter.new_log.emit("预测记录核验完成")
+            # 核验即产生新的前向表现样本 → 刷新模型动态权重（失败不影响核验）
+            self._refresh_model_weights()
         except Exception as e:
             self.log_emitter.new_log.emit(f"核验失败: {e}")
+
+    def _refresh_model_weights(self):
+        """核验后重算各彩种模型动态权重并简要播报"""
+        try:
+            from model_weights import update_all_weights
+            results = update_all_weights()
+            for lt, res in results.items():
+                rec = res.get('recommended_model')
+                parts = []
+                for mt in ('gbdt', 'lightgbm', 'random_forest', 'xgboost', 'catboost'):
+                    s = res['models'].get(mt, {})
+                    if s.get('samples'):
+                        parts.append(f"{mt}:{s['weight']:.2f}")
+                self.statusBar().showMessage(
+                    f"{lt.upper()} 模型权重已更新 (推荐:{rec or '样本不足'}) " +
+                    " ".join(parts), 15000)
+        except Exception as e:
+            self.log_emitter.new_log.emit(f"模型权重更新失败: {e}")
 
     def export_prediction_records(self):
         """导出预测记录为CSV"""
@@ -2845,16 +2875,70 @@ class LotteryPredictorApp(QMainWindow):
         self.opt_log_box.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
     def _on_opt_tab_shown(self, index):
-        """切换到'模型优化'标签页时自动刷新校准状态与特征列表"""
+        """切换到'模型优化'标签页时自动刷新校准状态、特征列表与表现榜"""
         if index == self.tab_widget.indexOf(self.optimization_tab):
             self.refresh_calibration_status()
             self.refresh_feature_list()
+            self.refresh_model_weights_ui()
+
+    def refresh_model_weights_ui(self):
+        """刷新模型前向表现榜（从 model_weights.json 读取，无文件时即时计算）"""
+        try:
+            from model_weights import get_performance_report, WEIGHTABLE_MODELS
+            lottery_type = self._get_opt_lottery_type()
+            report = get_performance_report(lottery_type)
+            if not report or not report.get('models'):
+                self.opt_weights_table.setRowCount(0)
+                self.opt_recommended_label.setText("推荐模型: -")
+                self.opt_weights_update_label.setText("更新时间: -")
+                return
+
+            models = report['models']
+            # 只展示可加权的核心ML子模型，按权重降序
+            rows = [(mt, models[mt]) for mt in WEIGHTABLE_MODELS if mt in models]
+            rows.sort(key=lambda x: x[1].get('weight', 0.0), reverse=True)
+
+            self.opt_weights_table.setRowCount(len(rows))
+            for row, (mt, st) in enumerate(rows):
+                sufficient = st.get('sufficient', False)
+                status = '样本充足' if sufficient else '样本不足(中性权重)'
+                self.opt_weights_table.setItem(row, 0, QTableWidgetItem(mt))
+                self.opt_weights_table.setItem(row, 1, QTableWidgetItem(str(st.get('samples', 0))))
+                self.opt_weights_table.setItem(row, 2, QTableWidgetItem(f"{st.get('avg_red_hits', 0.0):.2f}"))
+                self.opt_weights_table.setItem(row, 3, QTableWidgetItem(f"{st.get('hit_rate', 0.0) * 100:.1f}%"))
+                excess = st.get('ewma_excess', st.get('avg_excess', 0.0))
+                item = QTableWidgetItem(f"{excess:+.4f}")
+                from PyQt5.QtGui import QColor
+                item.setForeground(QColor('#2E7D32' if excess > 0 else '#C62828'))
+                self.opt_weights_table.setItem(row, 4, item)
+                self.opt_weights_table.setItem(row, 5, QTableWidgetItem(f"{st.get('weight', 0.0):.3f}"))
+                self.opt_weights_table.setItem(row, 6, QTableWidgetItem(status))
+
+            rec = report.get('recommended_model') or '-'
+            self.opt_recommended_label.setText(f"推荐模型: {rec}")
+            self.opt_weights_update_label.setText(f"更新时间: {report.get('updated_at', '-')[:19].replace('T', ' ')}")
+        except Exception as e:
+            self._opt_log(f"刷新表现榜失败: {e}")
+
+    def recalc_model_weights_ui(self):
+        """手动重算全部彩种动态权重（核验后自动重算，此处提供手动触发）"""
+        try:
+            from model_weights import update_all_weights
+            self._opt_log("正在按已核验记录重算模型权重...")
+            results = update_all_weights()
+            for lt, rep in (results or {}).items():
+                rec = rep.get('recommended_model') or '-'
+                self._opt_log(f"  {lt.upper()} 权重已更新, 推荐模型: {rec}")
+            self.refresh_model_weights_ui()
+        except Exception as e:
+            self._opt_log(f"重算权重失败: {e}")
 
     def _set_opt_buttons_enabled(self, enabled):
         """批量启用/禁用优化页操作按钮"""
         for btn in [self.opt_refresh_calib_btn, self.opt_train_calib_btn,
                     self.opt_show_calib_btn, self.opt_run_feat_btn,
                     self.opt_refresh_feat_btn, self.opt_drift_check_btn,
+                    self.opt_refresh_weights_btn, self.opt_recalc_weights_btn,
                     self.opt_retrain_one_btn, self.opt_retrain_all_btn]:
             btn.setEnabled(enabled)
 
@@ -3122,26 +3206,44 @@ class LotteryPredictorApp(QMainWindow):
 
     # ==================== 模型优化标签页 - 反馈重训练 ====================
 
+    def _get_retrain_options(self):
+        """从UI读取重训练参数: (model_types, recent_periods, feature_mode, include_lstm)"""
+        text = self.opt_model_multi_edit.text().strip()
+        model_types = [t.strip() for t in text.split(',') if t.strip()] or None
+        recent = self.opt_recent_spin.value()
+        recent_periods = recent if recent > 0 else None
+        feature_mode = 'enhanced' if self.opt_enhanced_retrain_check.isChecked() else 'original'
+        include_lstm = self.opt_lstm_retrain_check.isChecked()
+        return model_types, recent_periods, feature_mode, include_lstm
+
     def retrain_current_lottery(self):
         """重训练当前彩票的ML模型"""
         lottery_type = self._get_opt_lottery_type()
         use_gpu = self.opt_use_gpu_check.isChecked()
+        model_types, recent_periods, feature_mode, include_lstm = self._get_retrain_options()
 
         reply = QMessageBox.question(
             self, "确认重训练",
             f"重训练 {lottery_type.upper()} 的 ML 模型？\n\n"
             f"使用GPU: {'是' if use_gpu else '否'}\n"
-            f"模型: {self.opt_model_multi_edit.text() or '全部'}\n\n"
+            f"模型: {self.opt_model_multi_edit.text() or '全部'}\n"
+            f"近期窗口: {recent_periods if recent_periods else '全量'}\n"
+            f"特征模式: {feature_mode}\n"
+            f"含LSTM-CRF: {'是' if include_lstm else '否'}\n\n"
             f"此过程可能耗时较长，确定继续？",
             QMessageBox.Yes | QMessageBox.No)
         if reply != QMessageBox.Yes:
             return
 
         self._set_opt_buttons_enabled(False)
-        self._opt_log(f"开始重训练 {lottery_type.upper()} 模型 (GPU={'开' if use_gpu else '关'})...")
+        self._opt_log(
+            f"开始重训练 {lottery_type.upper()} 模型 (GPU={'开' if use_gpu else '关'}, "
+            f"近窗={recent_periods or '全量'}, 特征={feature_mode}, LSTM={'开' if include_lstm else '关'})...")
 
         self.retrain_thread = RetrainThread(
-            lottery_type=lottery_type, use_gpu=use_gpu)
+            lottery_type=lottery_type, use_gpu=use_gpu,
+            model_types=model_types, recent_periods=recent_periods,
+            feature_mode=feature_mode, include_lstm=include_lstm)
         self.retrain_thread.log_signal.connect(self._opt_log)
         self.retrain_thread.finished_signal.connect(self._on_retrain_done)
         self.retrain_thread.start()
@@ -3149,6 +3251,7 @@ class LotteryPredictorApp(QMainWindow):
     def retrain_all_lotteries_ui(self):
         """重训练全部彩票模型"""
         use_gpu = self.opt_use_gpu_check.isChecked()
+        model_types, recent_periods, feature_mode, include_lstm = self._get_retrain_options()
 
         reply = QMessageBox.question(
             self, "确认全部重训练",
@@ -3163,7 +3266,9 @@ class LotteryPredictorApp(QMainWindow):
         self._opt_log("开始重训练全部彩票模型...")
 
         self.retrain_thread = RetrainThread(
-            retrain_all=True, use_gpu=use_gpu)
+            retrain_all=True, use_gpu=use_gpu,
+            recent_periods=recent_periods, feature_mode=feature_mode,
+            include_lstm=include_lstm)
         self.retrain_thread.log_signal.connect(self._opt_log)
         self.retrain_thread.finished_signal.connect(self._on_retrain_done)
         self.retrain_thread.start()

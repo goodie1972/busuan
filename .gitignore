@@ -34,3 +34,9 @@ prediction_history.json
 
 # 模型优化运行时产物（特征分析/漂移检测结果，可再生成，不入库）
 feature_analysis/
+
+# 权重/校准运行时产物（可再生成，不入库）
+model_weights.json
+model_calibration/
+retrain_reports/
+_bak/
