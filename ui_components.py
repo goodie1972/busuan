@@ -1671,6 +1671,79 @@ def create_investment_plan_tab_new(investment_tab):
             select_all_invest_btn, clear_all_invest_btn)
 
 
+def create_health_panel():
+    """
+    创建系统健康度监控面板（v2智能优化）
+    
+    Returns:
+        tuple: (health_group, health_score_label, health_details_text, diagnose_btn, 
+                pending_list, execute_btn, reject_btn, auto_opt_check)
+    """
+    from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QListWidget, QCheckBox
+    
+    card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #4A90E2; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { padding-left: 10px; color: #4A90E2; }"
+    btn_style = "font-size: 11pt; min-height: 30px; padding: 4px 12px;"
+    
+    health_group = QGroupBox("🏥 系统健康度监控 (V2智能优化)")
+    layout = QVBoxLayout(health_group)
+    
+    # 第1行：健康度得分
+    score_row = QHBoxLayout()
+    score_row.addWidget(QLabel("健康度得分:"))
+    health_score_label = QLabel("未检测")
+    health_score_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #666;")
+    score_row.addWidget(health_score_label)
+    score_row.addStretch()
+    
+    diagnose_btn = QPushButton("🔍 智能诊断")
+    diagnose_btn.setStyleSheet(btn_style + " background-color: #4A90E2; color: white; font-weight: bold;")
+    score_row.addWidget(diagnose_btn)
+    
+    auto_opt_check = QCheckBox("自动执行低风险操作")
+    auto_opt_check.setChecked(True)
+    auto_opt_check.setStyleSheet("font-size: 10pt;")
+    score_row.addWidget(auto_opt_check)
+    
+    layout.addLayout(score_row)
+    
+    # 第2行：健康详情
+    health_details_text = QTextEdit()
+    health_details_text.setReadOnly(True)
+    health_details_text.setMaximumHeight(80)
+    health_details_text.setPlaceholderText("点击'智能诊断'查看系统健康状态...")
+    health_details_text.setStyleSheet("font-size: 10pt; background-color: #F9F9F9;")
+    layout.addWidget(health_details_text)
+    
+    # 第3行：待确认操作列表
+    pending_label = QLabel("⚠️ 待确认操作 (高风险需手动批准):")
+    pending_label.setStyleSheet("font-size: 10pt; font-weight: bold; color: #E67E22;")
+    layout.addWidget(pending_label)
+    
+    pending_list = QListWidget()
+    pending_list.setMaximumHeight(100)
+    pending_list.setStyleSheet("font-size: 10pt;")
+    layout.addWidget(pending_list)
+    
+    # 第4行：操作按钮
+    action_row = QHBoxLayout()
+    action_row.addStretch()
+    execute_btn = QPushButton("✓ 执行选中")
+    execute_btn.setStyleSheet(btn_style + " background-color: #27AE60; color: white;")
+    execute_btn.setEnabled(False)
+    action_row.addWidget(execute_btn)
+    
+    reject_btn = QPushButton("✗ 拒绝选中")
+    reject_btn.setStyleSheet(btn_style + " background-color: #E74C3C; color: white;")
+    reject_btn.setEnabled(False)
+    action_row.addWidget(reject_btn)
+    layout.addLayout(action_row)
+    
+    health_group.setStyleSheet(card_style)
+    
+    return (health_group, health_score_label, health_details_text, diagnose_btn,
+            pending_list, execute_btn, reject_btn, auto_opt_check)
+
+
 def create_optimization_tab(optimization_tab):
     """
     创建模型优化标签页：包含模型校准、特征分析、反馈重训练三大子模块
@@ -1686,6 +1759,11 @@ def create_optimization_tab(optimization_tab):
     spin_style = "font-size: 11pt; min-height: 26px;"
     card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { padding-left: 10px; }"
     btn_style = "font-size: 11pt; min-height: 30px; padding: 4px 12px;"
+
+    # ==================== V2 健康度监控面板 ====================
+    (health_group, health_score_label, health_details_text, diagnose_btn,
+     pending_list, execute_btn, reject_btn, auto_opt_check) = create_health_panel()
+    layout.addWidget(health_group)
 
     # ==================== 顶部：彩票类型选择 ====================
     top_row = QHBoxLayout()
@@ -1896,5 +1974,7 @@ def create_optimization_tab(optimization_tab):
             use_gpu_check, recent_spin, enhanced_retrain_check, lstm_retrain_check,
             model_multi_edit,
             retrain_one_btn, retrain_all_btn, retrain_status_label,
-            opt_log_box)
+            opt_log_box,
+            health_score_label, health_details_text, diagnose_btn,
+            pending_list, execute_btn, reject_btn, auto_opt_check)
 

@@ -119,6 +119,9 @@ class LotteryPredictorApp(QMainWindow):
         self.investment_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
                                            'investment_history.json')
         
+        # V2智能优化相关
+        self.pending_actions = []  # 待确认的优化操作
+        
         # 自动重训策略相关
         self.autoretrain_enabled = False
         self.backtest_history = []  # 保存历史回测结果
@@ -301,12 +304,19 @@ class LotteryPredictorApp(QMainWindow):
          self.opt_use_gpu_check, self.opt_recent_spin, self.opt_enhanced_retrain_check, self.opt_lstm_retrain_check,
          self.opt_model_multi_edit,
          self.opt_retrain_one_btn, self.opt_retrain_all_btn, self.opt_retrain_status_label,
-         self.opt_log_box) = create_optimization_tab(self.optimization_tab)
+         self.opt_log_box,
+         self.health_score_label, self.health_details_text, self.diagnose_btn,
+         self.pending_list, self.execute_btn, self.reject_btn, self.auto_opt_check) = create_optimization_tab(self.optimization_tab)
 
         # 连接校准信号槽
         self.opt_refresh_calib_btn.clicked.connect(self.refresh_calibration_status)
         self.opt_train_calib_btn.clicked.connect(self.start_calibration)
         self.opt_show_calib_btn.clicked.connect(self.show_calibration_curve)
+        # 连接v2健康度监控信号槽
+        self.diagnose_btn.clicked.connect(self.run_smart_diagnosis)
+        self.execute_btn.clicked.connect(self.execute_pending_actions)
+        self.reject_btn.clicked.connect(self.reject_pending_actions)
+        self.pending_list.itemSelectionChanged.connect(self.update_action_buttons)
         # 连接特征分析信号槽
         self.opt_run_feat_btn.clicked.connect(self.run_feature_analysis_ui)
         self.opt_refresh_feat_btn.clicked.connect(self.refresh_feature_list)
@@ -3285,6 +3295,149 @@ class LotteryPredictorApp(QMainWindow):
             QMessageBox.information(self, "完成", "模型重训练完成！")
         else:
             QMessageBox.warning(self, "警告", "部分模型重训练失败，请查看日志。")
+
+    # ==================== V2智能优化方法 ====================
+    
+    def run_smart_diagnosis(self):
+        """运行智能诊断"""
+        try:
+            from optimization_monitor import OptimizationMonitor
+            from llm_optimizer import LLMOptimizer
+            
+            lottery_type = self._get_current_lottery_type()
+            self._opt_log("开始智能诊断...")
+            self.diagnose_btn.setEnabled(False)
+            
+            # 1. 健康检查
+            monitor = OptimizationMonitor()
+            health_report = monitor.check_health(lottery_type)
+            
+            # 显示健康度得分
+            score = health_report['health_score']
+            color = '#27AE60' if score >= 7 else ('#E67E22' if score >= 4 else '#E74C3C')
+            self.health_score_label.setText(f"{score:.1f} / 10.0")
+            self.health_score_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {color};")
+            
+            # 显示健康详情
+            details = []
+            for check in health_report['checks']:
+                status = "✓" if check['status'] == 'healthy' else ("⚠" if check['status'] == 'warning' else "✗")
+                details.append(f"{status} {check['name']}: {check['message']}")
+            self.health_details_text.setText("\n".join(details))
+            
+            # 2. LLM决策
+            llm = LLMOptimizer()
+            actions = llm.suggest_actions(health_report)
+            
+            self._opt_log(f"诊断完成: 健康度={score:.1f}/10, 建议{len(actions)}项操作")
+            
+            # 3. 处理建议操作
+            self.pending_list.clear()
+            self.pending_actions = []  # 存储待执行的操作
+            
+            auto_executed = []
+            for action in actions:
+                if action['auto_execute'] and self.auto_opt_check.isChecked():
+                    # 自动执行低风险操作
+                    auto_executed.append(action)
+                else:
+                    # 添加到待确认列表
+                    desc = f"[{action['action']}] {action['reason']}"
+                    self.pending_list.addItem(desc)
+                    self.pending_actions.append(action)
+            
+            # 自动执行低风险操作
+            if auto_executed:
+                self._execute_actions(auto_executed, auto=True)
+            
+            self.update_action_buttons()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"诊断失败: {str(e)}")
+            self._opt_log(f"诊断失败: {str(e)}")
+        finally:
+            self.diagnose_btn.setEnabled(True)
+    
+    def _execute_actions(self, actions, auto=False):
+        """执行优化操作"""
+        from optimization_executor import OptimizationExecutor
+        from optimization_log import log_optimization
+        
+        executor = OptimizationExecutor()
+        lottery_type = self._get_current_lottery_type()
+        
+        for action in actions:
+            try:
+                prefix = "[自动]" if auto else "[手动]"
+                self._opt_log(f"{prefix} 执行: {action['action']}")
+                
+                result = executor.execute(
+                    action['action'],
+                    lottery_type=lottery_type,
+                    dry_run=False
+                )
+                
+                log_optimization(
+                    lottery_type=lottery_type,
+                    action=action['action'],
+                    reason=action['reason'],
+                    result=result
+                )
+                
+                self._opt_log(f"  {result['status']}: {result['message']}")
+                
+            except Exception as e:
+                self._opt_log(f"  执行失败: {str(e)}")
+    
+    def execute_pending_actions(self):
+        """执行选中的待确认操作"""
+        selected_items = self.pending_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "提示", "请先选择要执行的操作")
+            return
+        
+        selected_indices = [self.pending_list.row(item) for item in selected_items]
+        selected_actions = [self.pending_actions[i] for i in selected_indices]
+        
+        # 确认对话框
+        action_names = [a['action'] for a in selected_actions]
+        reply = QMessageBox.question(
+            self, '确认执行',
+            f"确定要执行以下操作吗？\n\n" + "\n".join(action_names),
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self._execute_actions(selected_actions, auto=False)
+            # 移除已执行的项
+            for index in sorted(selected_indices, reverse=True):
+                self.pending_list.takeItem(index)
+                del self.pending_actions[index]
+            self.update_action_buttons()
+    
+    def reject_pending_actions(self):
+        """拒绝选中的待确认操作"""
+        selected_items = self.pending_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "提示", "请先选择要拒绝的操作")
+            return
+        
+        selected_indices = [self.pending_list.row(item) for item in selected_items]
+        
+        # 移除选中项
+        for index in sorted(selected_indices, reverse=True):
+            action = self.pending_actions[index]
+            self._opt_log(f"[拒绝] {action['action']}")
+            self.pending_list.takeItem(index)
+            del self.pending_actions[index]
+        
+        self.update_action_buttons()
+    
+    def update_action_buttons(self):
+        """更新操作按钮状态"""
+        has_selection = len(self.pending_list.selectedItems()) > 0
+        self.execute_btn.setEnabled(has_selection)
+        self.reject_btn.setEnabled(has_selection)
 
 def main():
     app = QApplication(sys.argv)
