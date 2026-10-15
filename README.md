@@ -150,6 +150,11 @@ python main.py records --verify
 **2026-10-06**
 - 新增号码共识热力图：统计各号码在近期预测中被推荐的频次，热力图直观展示共识号码
 
+**2026-10-16**
+- 对抗性安全检查：新增 json_utils（原子写入+自动备份+损坏恢复+线程安全）、input_validator（号码/期号/金额/复式/胆拖边界校验）、model_integrity（模型文件防损坏/伪造/炸弹加载校验）
+- 核心数据读取改为安全读写封装，杜绝崩溃/断电导致 prediction_history.json / model_weights.json 损坏丢失
+- 新增对抗测试：test_json_utils(6项)、test_input_validator(7项)、test_model_integrity(9项)，全部通过，现有 475 条预测记录零污染
+
 **2026-10-14**
 - 新增「模型反馈优化」体系：预测概率存档 → 核验 → 模型校准/动态权重/重训练闭环
 - 新增增强特征模式：21个时序衍生特征（遗漏值/滚动统计/重号率），训练/预测自动对齐，旧模型兼容（feature_mode 持久化）

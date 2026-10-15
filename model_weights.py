@@ -42,27 +42,28 @@ _RANDOM_BASE = {
 
 
 def _load_weights_file() -> Dict:
-    """读取权重文件（不存在/损坏返回空结构）"""
-    try:
-        with open(WEIGHTS_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            return data
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        pass
-    return {}
+    """
+    读取权重文件（线程安全，自动修复损坏）
+    
+    Returns:
+        dict: 权重数据，文件不存在/损坏则返回空字典
+    """
+    from json_utils import safe_json_load
+    return safe_json_load(WEIGHTS_FILE, default={}, try_backup=True)
 
 
 def _save_weights_file(data: Dict) -> bool:
-    """原子写权重文件"""
-    try:
-        tmp = WEIGHTS_FILE + '.tmp'
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, WEIGHTS_FILE)
-        return True
-    except OSError:
-        return False
+    """
+    原子写权重文件（自动备份）
+    
+    Args:
+        data: 权重数据字典
+        
+    Returns:
+        bool: 写入是否成功
+    """
+    from json_utils import safe_json_write
+    return safe_json_write(WEIGHTS_FILE, data, backup=True)
 
 
 def _bet_excess(record: Dict, base: Dict) -> Optional[float]:

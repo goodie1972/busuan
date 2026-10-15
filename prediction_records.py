@@ -9,11 +9,11 @@
 核验依据：预测时记录当时已知的最新期数 latest_period，
 目标期 = 数据中第一个 期数 > latest_period 的开奖期。
 """
-import json
 import os
 from datetime import datetime
 
 from backtest import SSQ_PRIZE_TABLE, DLT_PRIZE_TABLE, _load_csv_data
+from json_utils import safe_json_load, safe_json_write
 
 # 预测记录文件（UTF-8，与数据/模型分离）
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -21,21 +21,27 @@ HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 
 def load_records():
-    """读取全部预测记录（空/损坏时返回空列表）"""
-    if not os.path.exists(HISTORY_FILE):
-        return []
-    try:
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
+    """
+    读取全部预测记录（线程安全，自动修复损坏）
+    
+    Returns:
+        list: 预测记录列表，文件不存在/损坏则返回空列表
+    """
+    return safe_json_load(HISTORY_FILE, default=[], try_backup=True)
 
 
 def save_records(records):
-    """写回预测记录"""
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    """
+    写回预测记录（原子写入+自动备份）
+    
+    Args:
+        records: 预测记录列表
+        
+    Raises:
+        IOError: 写入失败（磁盘满/权限不足）时抛出
+    """
+    if not safe_json_write(HISTORY_FILE, records, backup=True):
+        raise IOError(f"写入 {HISTORY_FILE} 失败，请检查磁盘空间和权限")
 
 
 def add_prediction_record(lottery_type, model_type, latest_period,
