@@ -1732,6 +1732,36 @@ class LotteryPredictorApp(QMainWindow):
         self.update_data_button.setEnabled(True)
         self.lottery_combo.setEnabled(True)
         self.update_log("数据更新线程已结束。")
+        # 数据更新完成后自动核验所有预测记录（有开奖数据即可核验）
+        self.auto_verify_after_update()
+
+    def auto_verify_after_update(self):
+        """数据更新后自动核验所有待核验的预测记录（不阻塞，后台执行）"""
+        from PyQt5.QtCore import QTimer
+        # 延迟执行，确保状态栏已刷新
+        QTimer.singleShot(300, self._do_auto_verify)
+
+    def _do_auto_verify(self):
+        """后台执行自动核验，不阻塞 UI"""
+        if self.auto_predict_thread and self.auto_predict_thread.isRunning():
+            self.update_log("自动核验延迟：智能预测进行中")
+            return
+        try:
+            from prediction_records import verify_records
+            # 同步核验所有记录（数据量小时快速完成）
+            self.update_log("自动核验：检查是否有新开奖数据可核验...")
+            report = verify_records(
+                log_callback=lambda msg: self.log_emitter.new_log.emit(msg))
+            self.refresh_prediction_records()
+            self._refresh_model_weights()
+            verified = report.get('verified', 0)
+            pending = report.get('pending', 0)
+            if verified > 0:
+                self.update_log(f"自动核验完成：本次核验 {verified} 条，待核验 {pending} 条")
+            else:
+                self.update_log(f"自动核验：无新增可核验记录（待核验 {pending} 条）")
+        except Exception as e:
+            self.update_log(f"自动核验失败: {e}")
 
     def start_data_check(self):
         """启动数据更新检查线程（防重复启动）"""
@@ -3301,16 +3331,15 @@ class LotteryPredictorApp(QMainWindow):
     def run_smart_diagnosis(self):
         """运行智能诊断"""
         try:
-            from optimization_monitor import OptimizationMonitor
-            from llm_optimizer import LLMOptimizer
+            from optimization_monitor import generate_health_report
+            from llm_optimizer import analyze_health_report
             
             lottery_type = self._get_current_lottery_type()
             self._opt_log("开始智能诊断...")
             self.diagnose_btn.setEnabled(False)
             
             # 1. 健康检查
-            monitor = OptimizationMonitor()
-            health_report = monitor.check_health(lottery_type)
+            health_report = generate_health_report(lottery_type)
             
             # 显示健康度得分
             score = health_report['health_score']
@@ -3319,15 +3348,16 @@ class LotteryPredictorApp(QMainWindow):
             self.health_score_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {color};")
             
             # 显示健康详情
+            checks = health_report.get('checks', {})
             details = []
-            for check in health_report['checks']:
-                status = "✓" if check['status'] == 'healthy' else ("⚠" if check['status'] == 'warning' else "✗")
-                details.append(f"{status} {check['name']}: {check['message']}")
+            for check_name, check_data in checks.items():
+                status = "✓" if check_data.get('status') == 'healthy' else ("⚠" if check_data.get('status') == 'warning' else "✗")
+                details.append(f"{status} {check_name}: {check_data.get('message', '')}")
             self.health_details_text.setText("\n".join(details))
             
             # 2. LLM决策
-            llm = LLMOptimizer()
-            actions = llm.suggest_actions(health_report)
+            analysis = analyze_health_report(health_report, lottery_type)
+            actions = analysis.get('recommendations', [])
             
             self._opt_log(f"诊断完成: 健康度={score:.1f}/10, 建议{len(actions)}项操作")
             
@@ -3337,12 +3367,12 @@ class LotteryPredictorApp(QMainWindow):
             
             auto_executed = []
             for action in actions:
-                if action['auto_execute'] and self.auto_opt_check.isChecked():
+                if action.get('auto_executable', False) and self.auto_opt_check.isChecked():
                     # 自动执行低风险操作
                     auto_executed.append(action)
                 else:
                     # 添加到待确认列表
-                    desc = f"[{action['action']}] {action['reason']}"
+                    desc = f"[{action.get('action', '')}] {action.get('reason', '')}"
                     self.pending_list.addItem(desc)
                     self.pending_actions.append(action)
             
@@ -3360,31 +3390,31 @@ class LotteryPredictorApp(QMainWindow):
     
     def _execute_actions(self, actions, auto=False):
         """执行优化操作"""
-        from optimization_executor import OptimizationExecutor
-        from optimization_log import log_optimization
+        from optimization_executor import execute_single_action
+        from optimization_log import log_optimization_action
         
-        executor = OptimizationExecutor()
         lottery_type = self._get_current_lottery_type()
         
         for action in actions:
             try:
                 prefix = "[自动]" if auto else "[手动]"
-                self._opt_log(f"{prefix} 执行: {action['action']}")
+                self._opt_log(f"{prefix} 执行: {action.get('action', '')}")
                 
-                result = executor.execute(
-                    action['action'],
+                result = execute_single_action(
+                    action_type=action.get('action', ''),
                     lottery_type=lottery_type,
+                    params=action.get('params', {}),
                     dry_run=False
                 )
                 
-                log_optimization(
+                log_optimization_action(
                     lottery_type=lottery_type,
-                    action=action['action'],
-                    reason=action['reason'],
+                    action_type=action.get('action', ''),
+                    reason=action.get('reason', ''),
                     result=result
                 )
                 
-                self._opt_log(f"  {result['status']}: {result['message']}")
+                self._opt_log(f"  {result.get('status', 'unknown')}: {result.get('message', '')}")
                 
             except Exception as e:
                 self._opt_log(f"  执行失败: {str(e)}")

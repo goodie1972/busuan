@@ -69,28 +69,31 @@ def log_optimization_action(
         log_id: 日志ID
     """
     log_id = _generate_log_id()
+    # 安全处理 None 参数（对抗脏数据）
+    rec = recommendation if isinstance(recommendation, dict) else {}
+    res = result if isinstance(result, dict) else {'success': False, 'detail': '空结果'}
     entry = {
         'id': log_id,
         'timestamp': datetime.now().isoformat(),
         'trigger': trigger,
         'lottery_type': lottery_type,
         'action': action,
-        'reason': recommendation.get('reason', ''),
-        'params': recommendation.get('params', {}),
-        'priority': recommendation.get('priority', 'unknown'),
+        'reason': rec.get('reason', ''),
+        'params': rec.get('params', {}),
+        'priority': rec.get('priority', 'unknown'),
         'result': {
-            'success': result.get('success', False),
-            'detail': result.get('detail', ''),
+            'success': res.get('success', False),
+            'detail': res.get('detail', ''),
         },
         'health_before': health_before,
         'health_after': health_after,
     }
 
     # 保存 before/after 数据（如果有）
-    if 'before' in result:
-        entry['result']['before'] = result['before']
-    if 'after' in result:
-        entry['result']['after'] = result['after']
+    if 'before' in res:
+        entry['result']['before'] = res['before']
+    if 'after' in res:
+        entry['result']['after'] = res['after']
 
     # 读取现有日志
     data = safe_json_load(_LOG_FILE, {'logs': []})

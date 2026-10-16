@@ -56,9 +56,10 @@ def check_data_volume(lottery_type: str, records: Optional[List[Dict]] = None) -
     if records is None:
         records = safe_json_load(
             os.path.join(_BASE_DIR, 'prediction_history.json'), [])
-    # 过滤彩种 + 已核验（target_period 非 None）
+    # 过滤彩种 + 已核验（target_period 非 None），容忍 None / 非 dict 记录
     verified = [r for r in records
-                if r.get('lottery_type') == lottery_type
+                if isinstance(r, dict)
+                and r.get('lottery_type') == lottery_type
                 and r.get('target_period') is not None]
     count = len(verified)
     min_ok = _THRESHOLDS['min_verified_ok']
