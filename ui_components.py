@@ -1671,6 +1671,168 @@ def create_investment_plan_tab_new(investment_tab):
             select_all_invest_btn, clear_all_invest_btn)
 
 
+def create_improvement_center():
+    """
+    创建"预测改进中心"三栏布局 UI（V3）
+    
+    布局：状态栏 | 改进建议区 | 效果跟踪区 + 底部统计洞察
+    
+    Returns:
+        tuple: (improvement_group,
+                lottery_combo, refresh_btn, diagnose_btn, auto_check, backup_btn,
+                status_verified_label, status_calib_label, status_data_label, status_reco_label,
+                suggestion_table, auto_exec_btn,
+                effect_table,
+                insight_text, insight_apply_btn)
+    """
+    from PyQt5.QtWidgets import (QGroupBox, QVBoxLayout, QHBoxLayout, QLabel,
+                                 QPushButton, QTableWidget, QTableWidgetItem,
+                                 QCheckBox, QComboBox, QTextEdit, QHeaderView,
+                                 QAbstractItemView, QSplitter, QWidget)
+    from PyQt5.QtCore import Qt
+
+    card_style = ("QGroupBox { font-size: 11pt; font-weight: bold; "
+                  "border: 2px solid #2B579A; border-radius: 8px; "
+                  "margin-top: 10px; padding: 8px 6px 6px 6px;}"
+                  "QGroupBox::title { padding-left: 10px; color: #2B579A; }")
+    btn_style = "font-size: 10pt; min-height: 28px; padding: 4px 10px;"
+    label_style = "font-size: 10pt;"
+
+    improvement_group = QGroupBox()
+    main_layout = QVBoxLayout(improvement_group)
+
+    # ==================== 顶部工具栏 ====================
+    toolbar = QHBoxLayout()
+    toolbar.addWidget(QLabel("彩票类型:"))
+    lottery_combo = QComboBox()
+    lottery_combo.addItems(["双色球 (SSQ)", "大乐透 (DLT)"])
+    lottery_combo.setStyleSheet("font-size: 10pt; min-height: 28px;")
+    toolbar.addWidget(lottery_combo)
+    toolbar.addSpacing(10)
+
+    refresh_btn = QPushButton("刷新")
+    refresh_btn.setStyleSheet(btn_style)
+    toolbar.addWidget(refresh_btn)
+
+    diagnose_btn = QPushButton("立即诊断")
+    diagnose_btn.setStyleSheet(btn_style + " background-color: #2B579A; color: white; font-weight: bold;")
+    toolbar.addWidget(diagnose_btn)
+
+    auto_check = QCheckBox("自动执行低风险")
+    auto_check.setChecked(True)
+    auto_check.setStyleSheet("font-size: 10pt;")
+    toolbar.addWidget(auto_check)
+
+    backup_btn = QPushButton("立即备份")
+    backup_btn.setStyleSheet(btn_style)
+    toolbar.addWidget(backup_btn)
+    toolbar.addStretch()
+    main_layout.addLayout(toolbar)
+
+    # ==================== 三栏 Splitter ====================
+    splitter = QSplitter(Qt.Horizontal)
+
+    # ---- ① 状态栏 ----
+    status_widget = QWidget()
+    status_layout = QVBoxLayout(status_widget)
+    status_group = QGroupBox("系统状态")
+    status_inner = QVBoxLayout(status_group)
+
+    status_verified_label = QLabel("核验记录: -")
+    status_verified_label.setStyleSheet(label_style)
+    status_calib_label = QLabel("校准样本: -")
+    status_calib_label.setStyleSheet(label_style)
+    status_data_label = QLabel("数据新鲜度: -")
+    status_data_label.setStyleSheet(label_style)
+    status_reco_label = QLabel("推荐模型: -")
+    status_reco_label.setStyleSheet(label_style + " font-weight: bold; color: #2B579A;")
+
+    for lbl in [status_verified_label, status_calib_label,
+                status_data_label, status_reco_label]:
+        status_inner.addWidget(lbl)
+    status_inner.addStretch()
+    status_layout.addWidget(status_group)
+    splitter.addWidget(status_widget)
+
+    # ---- ② 改进建议区 ----
+    sugg_widget = QWidget()
+    sugg_layout = QVBoxLayout(sugg_widget)
+    sugg_group = QGroupBox("改进建议 (半自动)")
+    sugg_inner = QVBoxLayout(sugg_group)
+
+    suggestion_table = QTableWidget()
+    suggestion_table.setColumnCount(4)
+    suggestion_table.setHorizontalHeaderLabels(["类型", "说明", "风险", "操作"])
+    suggestion_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    suggestion_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+    suggestion_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+    suggestion_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+    suggestion_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    suggestion_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    sugg_inner.addWidget(suggestion_table)
+
+    sugg_action_row = QHBoxLayout()
+    auto_exec_btn = QPushButton("一键执行所有低风险")
+    auto_exec_btn.setStyleSheet(btn_style + " background-color: #27AE60; color: white; font-weight: bold;")
+    sugg_action_row.addWidget(auto_exec_btn)
+    reject_btn = QPushButton("忽略所有建议")
+    reject_btn.setStyleSheet(btn_style + " background-color: #999999; color: white;")
+    sugg_action_row.addWidget(reject_btn)
+    sugg_inner.addLayout(sugg_action_row)
+
+    sugg_layout.addWidget(sugg_group)
+    splitter.addWidget(sugg_widget)
+
+    # ---- ③ 效果跟踪区 ----
+    effect_widget = QWidget()
+    effect_layout = QVBoxLayout(effect_widget)
+    effect_group = QGroupBox("优化效果跟踪")
+    effect_inner = QVBoxLayout(effect_group)
+
+    effect_table = QTableWidget()
+    effect_table.setColumnCount(4)
+    effect_table.setHorizontalHeaderLabels(["时间", "操作", "状态", "效果摘要"])
+    effect_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+    effect_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+    effect_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+    effect_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+    effect_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+    effect_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+    effect_inner.addWidget(effect_table)
+
+    effect_layout.addWidget(effect_group)
+    splitter.addWidget(effect_widget)
+
+    # 设置三栏比例 1:2:2
+    splitter.setSizes([200, 400, 400])
+    main_layout.addWidget(splitter, 1)
+
+    # ==================== 底部统计洞察区 ====================
+    insight_group = QGroupBox("统计洞察 (联动高级统计)")
+    insight_group.setStyleSheet(card_style)
+    insight_layout = QVBoxLayout(insight_group)
+
+    insight_text = QTextEdit()
+    insight_text.setReadOnly(True)
+    insight_text.setMaximumHeight(120)
+    insight_text.setPlaceholderText("点击'立即诊断'或'刷新'查看统计洞察...")
+    insight_text.setStyleSheet("font-size: 9pt; background-color: #F9F9F9;")
+    insight_layout.addWidget(insight_text)
+
+    insight_apply_btn = QPushButton("应用洞察到选号参考")
+    insight_apply_btn.setStyleSheet(btn_style)
+    insight_layout.addWidget(insight_apply_btn)
+
+    main_layout.addWidget(insight_group)
+
+    return (improvement_group,
+            lottery_combo, refresh_btn, diagnose_btn, auto_check, backup_btn,
+            status_verified_label, status_calib_label, status_data_label, status_reco_label,
+            suggestion_table, auto_exec_btn, reject_btn,
+            effect_table,
+            insight_text, insight_apply_btn)
+
+
 def create_health_panel():
     """
     创建系统健康度监控面板（v2智能优化）
@@ -1760,10 +1922,17 @@ def create_optimization_tab(optimization_tab):
     card_style = "QGroupBox { font-size: 11pt; font-weight: bold; border: 2px solid #B0B0B0; border-radius: 8px; margin-top: 10px; padding: 8px 6px 6px 6px;} QGroupBox::title { padding-left: 10px; }"
     btn_style = "font-size: 11pt; min-height: 30px; padding: 4px 12px;"
 
-    # ==================== V2 健康度监控面板 ====================
-    (health_group, health_score_label, health_details_text, diagnose_btn,
-     pending_list, execute_btn, reject_btn, auto_opt_check) = create_health_panel()
-    layout.addWidget(health_group)
+    # ==================== 预测改进中心（V3） ====================
+    (improvement_group,
+     _ic_lottery_combo, _ic_refresh_btn, diagnose_btn, auto_opt_check, _ic_backup_btn,
+     _ic_verified_label, _ic_calib_label, _ic_data_label, _ic_reco_label,
+     pending_list, execute_btn, reject_btn,
+     _ic_effect_table,
+     health_details_text, _ic_insight_apply_btn) = create_improvement_center()
+    # health_details_text → insight_text (QTextEdit)
+    health_score_label = _ic_verified_label
+    # pending_list → suggestion_table, execute_btn → auto_exec_btn
+    layout.addWidget(improvement_group)
 
     # ==================== 顶部：彩票类型选择 ====================
     top_row = QHBoxLayout()

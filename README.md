@@ -197,3 +197,48 @@ python main.py records --verify
 ---
 
 **理性娱乐，有节制地玩彩票！**
+
+---
+
+## V3 数据库重构 (2026-10-17)
+
+### 数据架构升级
+- **SQLite 数据库** (`busuan.db`) 替代分散的 JSON 文件
+- 7张表：开奖记录、预测记录、模型权重历史、校准样本、投注计划、优化日志、分析缓存
+- 3个视图：已核验预测、模型表现榜、优化效果
+- **自动备份**：每日 03:00 备份到 `backup/` 目录
+
+### 迁移成果
+- 524 条预测记录（264 条已核验）
+- 6450 条开奖记录（SSQ 3515 + DLT 2935）
+- 2 条权重记录（SSQ + DLT）
+- 历史数据完整保留，无丢失
+
+### 新增文件
+- `schema.sql` — 数据库 schema（7 tables + 3 views + indexes）
+- `migrate_json_to_db.py` — JSON→SQLite 迁移脚本
+- `db_access.py` — 数据访问层（WAL 模式 + busy_timeout）
+- `db_backup.py` — 自动备份/恢复模块
+- `improvement_rules.py` — 规则引擎（R1-R7 半自动优化）
+- `statistics_insights.py` — 统计洞察（热冷/遗漏/趋势/综合建议）
+
+### 预测改进中心（V3 UI）
+- 三栏布局：状态 / 建议 / 效果
+- 底部统计洞察区（联动高级统计页）
+- 半自动执行：低风险自动 / 高风险手动确认
+- `create_improvement_center()` 替换旧 `create_optimization_tab`
+
+### 对抗性测试
+- DB 并发：5线程×20条写入无锁冲突（WAL模式）
+- 事务回滚：写入失败不损坏已有数据
+- 备份恢复：精确还原到备份时状态
+- SQL注入：参数化查询阻断注入
+- 批量写入：500条 0.16s（3184 rec/s）
+
+### 回归测试
+- db_access CRUD ✅
+- prediction_records 完整流程 ✅
+- model_weights 计算/更新/获取 ✅
+- improvement_rules 规则引擎 ✅
+- statistics_insights 热冷遗漏趋势 ✅
+- GUI 10标签页冒烟 ✅

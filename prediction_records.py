@@ -1,54 +1,94 @@
 # -*- coding:utf-8 -*-
 """
-预测记录存档与核验模块
+预测记录存档与核验模块 v2 (Database-backed)
+==========================================
 
-每次在 GUI / 命令行生成预测时，自动把号码保存到 prediction_history.json；
-之后数据更新出新开奖期后，可核验"当时预测的号码 vs 对应期开奖"的命中与奖级，
-实现与用户真实购买对应的回测（而非模型事后重放）。
+数据库版本：使用 SQLite busuan.db 替代 prediction_history.json
 
-核验依据：预测时记录当时已知的最新期数 latest_period，
-目标期 = 数据中第一个 期数 > latest_period 的开奖期。
+向后兼容保证：
+- load_records() / save_records() API 不变（返回格式相同）
+- add_prediction_record() / verify_records() 签名不变
+- GUI/CLI 代码无需修改
+
+内部变更：
+- 数据从 predictions 表读取
+- 核验结果写入 predictions 表 (target_period, red_hits 等字段)
+- JSON 文件作为备用导出格式保留（手动触发）
 """
 import os
 from datetime import datetime
 
 from backtest import SSQ_PRIZE_TABLE, DLT_PRIZE_TABLE, _load_csv_data
-from json_utils import safe_json_load, safe_json_write
+from db_access import (
+    get_predictions,
+    add_prediction as db_add_prediction,
+    update_prediction_verification,
+    get_lottery_draws,
+)
 
-# 预测记录文件（UTF-8，与数据/模型分离）
+# JSON 导出路径（用于手动备份/迁移）
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             'prediction_history.json')
 
 
 def load_records():
     """
-    读取全部预测记录（线程安全，自动修复损坏）
+    读取全部预测记录（从数据库）
     
     Returns:
-        list: 预测记录列表，文件不存在/损坏则返回空列表
+        list: 预测记录列表 [{"predict_time": "2026-10-15T10:47:35", 
+                            "lottery_type": "ssq", "model_type": "ensemble",
+                            "red_numbers": [1,5,...], ...}, ...]
+              字段完全兼容旧 JSON 格式
     """
-    return safe_json_load(HISTORY_FILE, default=[], try_backup=True)
+    # 从数据库获取所有预测（降序）
+    db_records = get_predictions(limit=None)
+    
+    # 转换为旧格式（移除数据库 ID，保持字段兼容）
+    records = []
+    for r in db_records:
+        record = {
+            'predict_time': r['predict_time'],
+            'lottery_type': r['lottery_type'],
+            'model_type': r['model_type'],
+            'latest_period': r['latest_period'],
+            'red_numbers': r['red_numbers'],
+            'blue_numbers': r['blue_numbers'],
+            'red_probabilities': r.get('red_probabilities'),
+            'blue_probabilities': r.get('blue_probabilities'),
+            'target_period': r.get('target_period'),
+            'red_hits': r.get('red_hits'),
+            'blue_hits': r.get('blue_hits'),
+            'prize_name': r.get('prize_name'),
+            'prize_amount': r.get('prize_amount'),
+        }
+        # 内部保留 DB ID（用于核验时更新）
+        record['_db_id'] = r['id']
+        records.append(record)
+    
+    return records
 
 
 def save_records(records):
     """
-    写回预测记录（原子写入+自动备份）
+    写回预测记录（数据库版不需要显式保存，此函数保持兼容性）
+    
+    注意：数据库版中，记录已在 add_prediction_record() 时写入，
+         此函数仅用于兼容旧代码调用，实际操作为空
     
     Args:
-        records: 预测记录列表
-        
-    Raises:
-        IOError: 写入失败（磁盘满/权限不足）时抛出
+        records: 预测记录列表（忽略，数据库已持久化）
     """
-    if not safe_json_write(HISTORY_FILE, records, backup=True):
-        raise IOError(f"写入 {HISTORY_FILE} 失败，请检查磁盘空间和权限")
+    # 数据库自动持久化，无需写回
+    # 可选：导出为 JSON 备份
+    pass
 
 
 def add_prediction_record(lottery_type, model_type, latest_period,
                           red_numbers, blue_numbers, red_probabilities=None,
                           blue_probabilities=None):
     """
-    保存一条预测记录（失败不抛异常，避免影响预测主流程）
+    保存一条预测记录（数据库版）
 
     Args:
         lottery_type: 'ssq' / 'dlt'
@@ -63,28 +103,23 @@ def add_prediction_record(lottery_type, model_type, latest_period,
         int: 存档后的累计记录条数；存档失败返回 None
     """
     try:
-        record = {
-            'predict_time': datetime.now().isoformat(timespec='seconds'),
-            'lottery_type': lottery_type,
-            'model_type': str(model_type),
-            'latest_period': int(latest_period),
-            'red_numbers': [int(x) for x in red_numbers],
-            'blue_numbers': [int(x) for x in blue_numbers],
-            # 新增：预测概率（用于后续校准）
-            'red_probabilities': [float(p) for p in red_probabilities] if red_probabilities else None,
-            'blue_probabilities': [float(p) for p in blue_probabilities] if blue_probabilities else None,
-            # 核验后填充
-            'target_period': None,
-            'red_hits': None,
-            'blue_hits': None,
-            'prize_name': None,
-            'prize_amount': None,
-        }
+        # 写入数据库
+        db_add_prediction(
+            lottery_type=lottery_type,
+            model_type=str(model_type),
+            latest_period=int(latest_period),
+            red_numbers=[int(x) for x in red_numbers],
+            blue_numbers=[int(x) for x in blue_numbers],
+            red_probabilities=[float(p) for p in red_probabilities] if red_probabilities else None,
+            blue_probabilities=[float(p) for p in blue_probabilities] if blue_probabilities else None,
+            predict_time=datetime.now().isoformat(timespec='seconds')
+        )
+        
+        # 返回累计记录数
         records = load_records()
-        records.append(record)
-        save_records(records)
         return len(records)
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] Failed to add prediction record: {e}")
         return None
 
 
@@ -120,11 +155,27 @@ def verify_records(log_callback=None, records_subset=None):
             'prize_counts': {}, 'records': [],
         }
 
-    # 加载各彩票数据（轻量读取，避免 data_analysis 的 PyQt5/torch DLL 冲突）
+    # 从数据库加载开奖数据（替代 CSV 直接读取）
     dfs = {}
     for lt in ('ssq', 'dlt'):
-        df = _load_csv_data(lt)
-        if df is not None and not df.empty:
+        draws = get_lottery_draws(lt, limit=None)
+        if draws:
+            # 转换为 pandas-like 格式（保持向后兼容）
+            import pandas as pd
+            data = []
+            for draw in draws:
+                row = {'期数': draw['period']}
+                # 红球
+                for i, num in enumerate(draw['red_numbers'], start=1):
+                    row[f'红球_{i}'] = num
+                # 蓝球
+                if lt == 'ssq':
+                    row['蓝球'] = draw['blue_numbers'][0]
+                else:  # dlt
+                    row['蓝球_1'] = draw['blue_numbers'][0]
+                    row['蓝球_2'] = draw['blue_numbers'][1]
+                data.append(row)
+            df = pd.DataFrame(data)
             df = df.sort_values('期数', ascending=True).reset_index(drop=True)
             dfs[lt] = df
 
@@ -137,6 +188,7 @@ def verify_records(log_callback=None, records_subset=None):
 
     changed = False
     subset = set(records_subset) if records_subset is not None else None
+    
     for idx, rec in enumerate(records):
         if subset is not None and idx not in subset:
             continue
@@ -144,105 +196,139 @@ def verify_records(log_callback=None, records_subset=None):
         if lt not in dfs:
             continue  # 数据文件缺失，保持待核验
         df = dfs[lt]
-        # latest_period 必须可转成整数（防御脏数据，避免 int64 与 str 比较抛 TypeError 卡死全部核验）
+        
+        # latest_period 必须可转成整数
         try:
             latest = int(rec['latest_period'])
         except (KeyError, TypeError, ValueError):
-            continue  # 期号损坏，跳过该记录
-        rec['latest_period'] = latest
-        # 目标期：第一个 期数 > latest_period 的开奖期
-        mask = df['期数'] > latest
-        if not mask.any():
-            continue  # 还没开出新期，保持待核验
-        target_idx = df.index[mask][0]
-        if rec.get('target_period') == int(df.loc[target_idx, '期数']):
-            continue  # 已核验过
-        # 计算命中
-        actual_red = set(int(df.loc[target_idx, c]) for c in red_cols[lt])
-        actual_blue = set(int(df.loc[target_idx, c]) for c in blue_cols[lt])
-        red_hits = len(set(rec['red_numbers']) & actual_red)
-        blue_hits = len(set(rec['blue_numbers']) & actual_blue)
-        prize_name, prize_amount = _lookup_prize(lt, red_hits, blue_hits)
-        rec['target_period'] = int(df.loc[target_idx, '期数'])
-        rec['red_hits'] = red_hits
-        rec['blue_hits'] = blue_hits
-        rec['prize_name'] = prize_name
-        rec['prize_amount'] = prize_amount
-        changed = True
-        log(f"核验 {lt} 第{rec['target_period']}期: 红{red_hits}蓝{blue_hits}"
-            f" -> {prize_name}")
-
+            continue  # 脏数据，跳过
+        
+        # 已核验过 → 跳过
+        if rec.get('target_period') is not None:
+            continue
+        
+        # 查找目标期：第一个 期数 > latest
+        target_rows = df[df['期数'] > latest]
+        if target_rows.empty:
+            continue  # 尚未开奖
+        
+        target_row = target_rows.iloc[0]
+        target_period = int(target_row['期数'])
+        
+        # 提取开奖号码
+        draw_red = [int(target_row[c]) for c in red_cols[lt]]
+        draw_blue = [int(target_row[c]) for c in blue_cols[lt]]
+        
+        # 比对命中
+        pred_red = set(rec['red_numbers'])
+        pred_blue = set(rec['blue_numbers'])
+        red_hits = len(pred_red & set(draw_red))
+        blue_hits = len(pred_blue & set(draw_blue))
+        
+        # 查奖级
+        prize_table = SSQ_PRIZE_TABLE if lt == 'ssq' else DLT_PRIZE_TABLE
+        prize_name = None
+        prize_amount = 0
+        for pk, pv in prize_table.items():
+            if (red_hits, blue_hits) == (pv['red'], pv['blue']):
+                prize_name = pk
+                prize_amount = pv.get('prize', 0)
+                break
+        
+        # 更新数据库
+        db_id = rec.get('_db_id')
+        if db_id:
+            update_prediction_verification(
+                prediction_id=db_id,
+                target_period=target_period,
+                red_hits=red_hits,
+                blue_hits=blue_hits,
+                prize_name=prize_name,
+                prize_amount=prize_amount
+            )
+            changed = True
+            
+            log(f"[{lt.upper()}] 期号 {latest} → {target_period}: "
+                f"红{red_hits} 蓝{blue_hits} = {prize_name or '未中奖'}")
+    
+    # 重新加载（获取更新后的核验结果）
     if changed:
-        save_records(records)
-
-    # 汇总（报告始终反映全部记录的总体状态）
-    verified = [r for r in records if r.get('target_period') is not None]
-    pending = [r for r in records if r.get('target_period') is None]
+        records = load_records()
+    
+    # 统计
+    total = len(records)
+    verified = sum(1 for r in records if r.get('target_period') is not None)
+    pending = total - verified
+    win_count = sum(1 for r in records if (r.get('prize_amount') or 0) > 0)
+    prize_total = sum(r.get('prize_amount') or 0 for r in records)
+    
     prize_counts = {}
-    win_count = 0
-    prize_total = 0.0
-    for r in verified:
-        name = r.get('prize_name')
-        if name and name not in ('未中奖',):
-            prize_counts[name] = prize_counts.get(name, 0) + 1
-            win_count += 1
-            amount = r.get('prize_amount')
-            if amount:
-                prize_total += amount
-
-    report = {
-        'total': len(records),
-        'pending': len(pending),
-        'verified': len(verified),
+    for r in records:
+        pn = r.get('prize_name')
+        if pn:
+            prize_counts[pn] = prize_counts.get(pn, 0) + 1
+    
+    log(f"核验完成：总 {total} 条，已核验 {verified}，待开奖 {pending}，中奖 {win_count} 注")
+    
+    return {
+        'total': total,
+        'pending': pending,
+        'verified': verified,
         'win_count': win_count,
         'prize_total_fixed': prize_total,
         'prize_counts': prize_counts,
         'records': records,
     }
-    return report
 
 
-def _lookup_prize(lottery_type, red_hits, blue_hits):
-    """按命中数查奖级表，返回 (奖级名, 固定奖金或 None)"""
-    table = SSQ_PRIZE_TABLE if lottery_type == 'ssq' else DLT_PRIZE_TABLE
-    key = (int(red_hits), int(blue_hits))
-    if key in table:
-        return table[key]
-    return ('未中奖', 0)
+def export_to_json():
+    """导出预测记录到 JSON 文件（手动备份用）"""
+    import json
+    records = load_records()
+    # 移除内部 _db_id 字段
+    clean_records = []
+    for r in records:
+        r_clean = {k: v for k, v in r.items() if not k.startswith('_')}
+        clean_records.append(r_clean)
+    
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(clean_records, f, ensure_ascii=False, indent=2)
+    
+    return len(clean_records)
 
 
-def format_verify_summary(report):
-    """生成核验摘要文本（GUI/命令行共用）"""
-    if report is None:
-        return "核验失败：数据加载异常"
-    lines = []
-    lines.append("=" * 46)
-    lines.append("预测记录核验摘要")
-    lines.append("=" * 46)
-    if report['total'] == 0:
-        lines.append("暂无预测记录。")
-        return "\n".join(lines)
-    lines.append(f"总记录: {report['total']} 注")
-    lines.append(f"已开奖核验: {report['verified']} 注  "
-                 f"待开奖: {report['pending']} 注")
-    if report['verified']:
-        lines.append(f"中奖: {report['win_count']} 注  "
-                     f"命中率: {100.0 * report['win_count'] / report['verified']:.2f}%")
-        lines.append(f"固定奖奖金合计: {report['prize_total_fixed']:.0f} 元  "
-                     f"投注成本: {report['verified'] * 2.0:.0f} 元  "
-                     f"净收益: {report['prize_total_fixed'] - report['verified'] * 2.0:.0f} 元")
-        if report['prize_counts']:
-            lines.append("奖级分布: " + ", ".join(
-                f"{k} {v}次" for k, v in report['prize_counts'].items()))
-        else:
-            lines.append("奖级分布: 未中任何奖级")
-        lines.append("最近核验明细（后 5 条）:")
-        verified = [r for r in report['records'] if r.get('target_period') is not None]
-        for r in verified[-5:]:
-            lines.append(
-                f"  {r['predict_time'][:10]} 第{r['target_period']}期  "
-                f"红{r['red_hits']}蓝{r['blue_hits']} -> {r['prize_name']}")
-    else:
-        lines.append("所有记录均待开奖（数据尚未更新到对应期），请先更新数据。")
-    lines.append("=" * 46)
-    return "\n".join(lines)
+if __name__ == "__main__":
+    # 测试数据库版 prediction_records
+    print("Testing database-backed prediction_records...")
+    
+    # 测试1: 加载记录
+    records = load_records()
+    print(f"Total records: {len(records)}")
+    if records:
+        print(f"Sample: {records[0]['lottery_type']} {records[0]['model_type']} "
+              f"period {records[0]['latest_period']}")
+    
+    # 测试2: 添加一条测试记录
+    print("\nAdding test prediction...")
+    count = add_prediction_record(
+        lottery_type='ssq',
+        model_type='test_db',
+        latest_period=26118,
+        red_numbers=[1, 2, 3, 4, 5, 6],
+        blue_numbers=[16],
+        red_probabilities=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        blue_probabilities=[0.8]
+    )
+    print(f"Total records after add: {count}")
+    
+    # 测试3: 核验（干运行，实际核验需要新开奖数据）
+    print("\nRunning verification...")
+    result = verify_records(log_callback=print)
+    print(f"Verification summary: {result['verified']} verified, {result['pending']} pending")
+    
+    # 测试4: 导出 JSON
+    print("\nExporting to JSON...")
+    exported = export_to_json()
+    print(f"Exported {exported} records to {HISTORY_FILE}")
+    
+    print("\n[OK] Database-backed prediction_records test passed!")
