@@ -2215,8 +2215,10 @@ class LotteryMLModels:
             (red_dan, red_tuo, blue_dan, blue_tuo) 四元组，元素均为号码列表 或 (None, None, None, None)
         """
         red_dan_count = max(1, min(red_dan_count, self.red_count - 1))
-        blue_dan_count = max(1, min(blue_dan_count, self.blue_count - 1)) \
-            if self.blue_count >= 2 else 0
+        # 蓝胆：尊重用户设置（0 = 不要蓝胆），仅做上限截断
+        # SSQ 蓝球单式只选 1 个 → 蓝胆上限 0；DLT 蓝球选 2 个 → 蓝胆上限 1
+        blue_dan_max = self.blue_count - 1 if self.blue_count >= 2 else 0
+        blue_dan_count = max(0, min(blue_dan_count, blue_dan_max))
         red_tuo_min = self.red_count - red_dan_count
         blue_tuo_min = self.blue_count - blue_dan_count if blue_dan_count >= 1 else self.blue_count
         red_tuo_count = max(red_tuo_min, min(red_tuo_count, self.red_range - red_dan_count))

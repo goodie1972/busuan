@@ -43,6 +43,7 @@ _bak/
 
 # V3 数据库迁移备份（不入库）
 _migration_backup/
+.test_backup/
 _test_backup/
 backup/
 *.bak

@@ -48,6 +48,9 @@ def create_main_tab(main_tab):
 
     # ==================== 第一行：彩票类型 + 预测模型 ====================
     row1 = QHBoxLayout()
+
+    # 彩票类型组合顺序（必须与 UI 顺序一致）
+    LOTTERY_KEYS = ['ssq', 'dlt']  # 0=双色球, 1=大乐透
     row1.setSpacing(12)
     lottery_label = QLabel("彩票类型:")
     lottery_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
@@ -163,6 +166,41 @@ def create_main_tab(main_tab):
     cards_layout.addWidget(dantuo_card, 1)
 
     main_layout.addLayout(cards_layout)
+
+    # ---- 胆拖范围随彩票类型联动 ----
+    def _sync_dantuo_ranges():
+        """根据彩票类型同步胆拖控件范围
+        SSQ: 红球6选1，蓝球选1 → 红胆1-5，蓝胆固定0（不支持蓝胆）
+        DLT: 红球5选2，蓝球选2 → 红胆1-4，蓝胆0-1
+        """
+        # combo 索引映射：0=双色球(ssq), 1=大乐透(dlt)
+        lt_key = 'ssq' if lottery_combo.currentIndex() == 0 else 'dlt'
+        if lt_key == 'dlt':
+            red_cnt, blue_cnt, red_range, blue_range = 5, 2, 35, 12
+        else:
+            red_cnt, blue_cnt, red_range, blue_range = 6, 1, 33, 16
+        # 红胆上限 = 单式红球数 - 1；红拖上限 = 红球范围 - 红胆
+        dt_red_dan.setRange(1, max(1, red_cnt - 1))
+        dt_red_tuo.setRange(1, red_range)
+        # 蓝胆：单式蓝球数 >= 2 才有胆拖空间，否则固定 0 并禁用
+        if blue_cnt >= 2:
+            dt_blue_dan.setRange(0, blue_cnt - 1)
+            dt_blue_dan.setEnabled(True)
+            dt_blue_dan.setToolTip(f"蓝球胆码个数(0-{blue_cnt - 1}，0=不要蓝胆)")
+        else:
+            dt_blue_dan.setRange(0, 0)
+            dt_blue_dan.setValue(0)
+            dt_blue_dan.setEnabled(False)
+            dt_blue_dan.setToolTip("该彩票蓝球单式只选1个，不支持蓝胆")
+        dt_blue_tuo.setRange(1, blue_range)
+        # 修正当前值超范围
+        if dt_red_dan.value() > dt_red_dan.maximum():
+            dt_red_dan.setValue(dt_red_dan.maximum())
+        if dt_blue_tuo.value() > dt_blue_tuo.maximum():
+            dt_blue_tuo.setValue(dt_blue_tuo.maximum())
+
+    lottery_combo.currentIndexChanged.connect(lambda _: _sync_dantuo_ranges())
+    _sync_dantuo_ranges()  # 初始化
 
     # ==================== 模式互斥逻辑 ====================
     mode_cards = {'单式': single_card, '复式': compound_card, '胆拖': dantuo_card}
@@ -1529,6 +1567,10 @@ def create_prediction_records_tab(records_tab):
     records_table.setSelectionBehavior(QAbstractItemView.SelectRows)
     records_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
     records_table.setMinimumHeight(300)
+    # 开启表头点击排序（升/降序切换）
+    records_table.setSortingEnabled(True)
+    records_table.horizontalHeader().setSortIndicatorShown(True)
+    records_table.horizontalHeader().setSectionsClickable(True)
     layout.addWidget(records_table, 1)
 
     # ---- 统计标签 ----

@@ -571,7 +571,8 @@ class LotteryPredictorApp(QMainWindow):
 
     def train_model(self):
         selected_index = self.lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        lottery_keys = ['ssq', 'dlt']  # 必须与 UI 顺序一致
+        selected_key = lottery_keys[selected_index]
         lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
         
@@ -654,7 +655,7 @@ class LotteryPredictorApp(QMainWindow):
 
     def generate_prediction(self):
         selected_index = self.lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
         lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
         num_predictions = self.prediction_spin.value()
@@ -1172,38 +1173,71 @@ class LotteryPredictorApp(QMainWindow):
                     continue
                 filtered.append((rec_idx, rec))
 
+            # 填充表格前关闭排序，避免插入过程中抖动
+            self.records_table.setSortingEnabled(False)
             self.records_table.setRowCount(0)
             self._records_row_index = {}  # 表格行号 -> 全部记录中的下标（供"核验选中"）
+
+            total = len(filtered)
+
             for i, (rec_idx, rec) in enumerate(reversed(filtered)):
                 row = self.records_table.rowCount()
                 self.records_table.insertRow(row)
                 self._records_row_index[row] = rec_idx
-                self.records_table.setItem(row, 0, QTableWidgetItem(str(len(filtered) - i)))
-                self.records_table.setItem(row, 1, QTableWidgetItem(rec.get('predict_time', '?')[:19]))
+
+                seq = total - i  # 最新记录序号最大
+                seq_item = QTableWidgetItem()
+                seq_item.setData(Qt.DisplayRole, seq)  # 数字显示，按数值排序
+                seq_item.setData(Qt.UserRole, rec_idx)  # 真实索引
+                self.records_table.setItem(row, 0, seq_item)
+
+                time_item = QTableWidgetItem(rec.get('predict_time', '?')[:19])
+                time_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 1, time_item)
+
                 lt_name = "双色球" if rec.get('lottery_type') == 'ssq' else "大乐透"
-                self.records_table.setItem(row, 2, QTableWidgetItem(lt_name))
-                self.records_table.setItem(row, 3, QTableWidgetItem(rec.get('model_type', '?')))
-                self.records_table.setItem(row, 4, QTableWidgetItem(str(rec.get('latest_period', '?'))))
+                lt_item = QTableWidgetItem(lt_name)
+                lt_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 2, lt_item)
+
+                model_item = QTableWidgetItem(rec.get('model_type', '?'))
+                model_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 3, model_item)
+
+                period_val = rec.get('latest_period')
+                period_item = QTableWidgetItem()
+                if isinstance(period_val, (int, float)):
+                    period_item.setData(Qt.DisplayRole, int(period_val))  # 数值排序
+                else:
+                    period_item.setText(str(period_val if period_val is not None else '?'))
+                period_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 4, period_item)
+
                 red = rec.get('red_numbers', [])
                 blue = rec.get('blue_numbers', [])
-                self.records_table.setItem(row, 5, QTableWidgetItem(" ".join(f"{n:02d}" for n in red)))
-                self.records_table.setItem(row, 6, QTableWidgetItem(" ".join(f"{n:02d}" for n in blue)))
+                red_item = QTableWidgetItem(" ".join(f"{n:02d}" for n in red))
+                red_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 5, red_item)
+                blue_item = QTableWidgetItem(" ".join(f"{n:02d}" for n in blue))
+                blue_item.setData(Qt.UserRole, rec_idx)
+                self.records_table.setItem(row, 6, blue_item)
+
                 prize = rec.get('prize_name')
                 if prize is None:
-                    status = "待核验"
-                    prize_text = "-"
-                    amount_text = "-"
+                    status, prize_text, amount_text = "待核验", "-", "-"
                 elif "未中" in str(prize):
-                    status = "已核验"
-                    prize_text = prize
-                    amount_text = "0"
+                    status, prize_text, amount_text = "已核验", prize, "0"
                 else:
-                    status = "已中奖"
-                    prize_text = prize
-                    amount_text = str(rec.get('prize_amount', 0))
-                self.records_table.setItem(row, 7, QTableWidgetItem(status))
-                self.records_table.setItem(row, 8, QTableWidgetItem(prize_text))
-                self.records_table.setItem(row, 9, QTableWidgetItem(amount_text))
+                    status, prize_text, amount_text = "已中奖", prize, str(rec.get('prize_amount', 0))
+
+                for col, val in ((7, status), (8, prize_text), (9, amount_text)):
+                    it = QTableWidgetItem(str(val))
+                    it.setData(Qt.UserRole, rec_idx)
+                    self.records_table.setItem(row, col, it)
+
+            # 恢复排序（默认按序号降序：最新在最上）
+            self.records_table.setSortingEnabled(True)
+            self.records_table.sortItems(0, Qt.DescendingOrder)
 
             verified = sum(1 for _, r in filtered if r.get('prize_name') is not None)
             won = sum(1 for _, r in filtered if r.get('prize_name') and "未中" not in str(r.get('prize_name')))
@@ -1215,10 +1249,15 @@ class LotteryPredictorApp(QMainWindow):
     def verify_selected_prediction_records(self):
         """核验选中的预测记录（未选中则核验全部，免去逐条勾选）"""
         selected_rows = sorted({item.row() for item in self.records_table.selectedItems()})
-        idx_map = getattr(self, '_records_row_index', {})
-        if selected_rows:
-            subset = [idx_map[r] for r in selected_rows if r in idx_map]
-        else:
+        # 排序后行号会变化，统一从单元格 UserRole 取真实记录索引
+        subset = []
+        for r in selected_rows:
+            it = self.records_table.item(r, 0)
+            if it is not None:
+                idx = it.data(Qt.UserRole)
+                if idx is not None:
+                    subset.append(idx)
+        if not subset:
             subset = None
         self._do_verify_records(subset)
 
@@ -1290,31 +1329,14 @@ class LotteryPredictorApp(QMainWindow):
                 return
             from prediction_records import load_records, save_records
             records = load_records()
-            # 通过匹配表格内容（预测时间+彩票+模型+期号+红球+蓝球）定位原始记录
+            # 直接从单元格 UserRole 取真实记录索引（不受排序影响）
             to_delete = set()
             for row in selected_rows:
-                if row >= self.records_table.rowCount():
-                    continue
-                predict_time = self.records_table.item(row, 1).text() if self.records_table.item(row, 1) else ""
-                lottery_name = self.records_table.item(row, 2).text() if self.records_table.item(row, 2) else ""
-                model = self.records_table.item(row, 3).text() if self.records_table.item(row, 3) else ""
-                period = self.records_table.item(row, 4).text() if self.records_table.item(row, 4) else ""
-                red_str = self.records_table.item(row, 5).text() if self.records_table.item(row, 5) else ""
-                blue_str = self.records_table.item(row, 6).text() if self.records_table.item(row, 6) else ""
-                # 在原始记录中查找匹配
-                for idx, rec in enumerate(records):
-                    if idx in to_delete:
-                        continue
-                    rec_lt = "双色球" if rec.get('lottery_type') == 'ssq' else "大乐透"
-                    rec_red = " ".join(f"{n:02d}" for n in rec.get('red_numbers', []))
-                    rec_blue = " ".join(f"{n:02d}" for n in rec.get('blue_numbers', []))
-                    if (rec.get('predict_time', '')[:19] == predict_time and
-                        rec_lt == lottery_name and
-                        rec.get('model_type', '') == model and
-                        str(rec.get('latest_period', '')) == period and
-                        rec_red == red_str and rec_blue == blue_str):
+                it = self.records_table.item(row, 0)
+                if it is not None:
+                    idx = it.data(Qt.UserRole)
+                    if idx is not None:
                         to_delete.add(idx)
-                        break
             records = [r for i, r in enumerate(records) if i not in to_delete]
             save_records(records)
             self.refresh_prediction_records()
@@ -1602,7 +1624,7 @@ class LotteryPredictorApp(QMainWindow):
 
     def analyze_data(self):
         selected_index = self.lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
         self.current_lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
         
@@ -1713,7 +1735,7 @@ class LotteryPredictorApp(QMainWindow):
 
     def update_lottery_data(self):
         selected_index = self.lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
         lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
 
@@ -1774,7 +1796,7 @@ class LotteryPredictorApp(QMainWindow):
             return
         self.last_data_check_time = now
 
-        current_lottery = list(name_path.keys())[self.lottery_combo.currentIndex()]
+        current_lottery = ['ssq', 'dlt'][self.lottery_combo.currentIndex()]  # 必须与 UI 顺序一致
         self.data_check_thread = DataCheckThread(lottery_type=current_lottery)
         self.data_check_thread.new_data_signal.connect(self.on_data_check_result)
         self.data_check_thread.start()
@@ -1800,7 +1822,7 @@ class LotteryPredictorApp(QMainWindow):
 
         # 获取当前选择
         lottery_index = self.lottery_combo.currentIndex()
-        lottery_keys = list(name_path.keys())
+        lottery_keys = ['ssq', 'dlt']  # 必须与 UI 顺序一致
         lottery_type = lottery_keys[lottery_index]
 
         model_text = self.model_combo.currentText()
@@ -1818,6 +1840,15 @@ class LotteryPredictorApp(QMainWindow):
 
         use_gpu = self.gpu_checkbox.isChecked()
         num_pred = self.prediction_spin.value()
+        # 读取当前预测模式（单式/复式/胆拖）
+        predict_mode = self.mode_combo.currentText()
+        # 读取复式/胆拖参数
+        fushi_red = self.compound_red_spin.value() if hasattr(self, 'compound_red_spin') else 0
+        fushi_blue = self.compound_blue_spin.value() if hasattr(self, 'compound_blue_spin') else 0
+        dt_red_dan = self.dt_red_dan.value() if hasattr(self, 'dt_red_dan') else 0
+        dt_red_tuo = self.dt_red_tuo.value() if hasattr(self, 'dt_red_tuo') else 0
+        dt_blue_dan = self.dt_blue_dan.value() if hasattr(self, 'dt_blue_dan') else 0
+        dt_blue_tuo = self.dt_blue_tuo.value() if hasattr(self, 'dt_blue_tuo') else 0
 
         # 禁用相关控件防止重复点击
         self.auto_predict_button.setEnabled(False)
@@ -1839,8 +1870,15 @@ class LotteryPredictorApp(QMainWindow):
             model_type=model_type,
             num_predictions=num_pred,
             use_gpu=use_gpu,
-            skip_fetch=False,
-            skip_train=False
+            skip_fetch=True,
+            skip_train=True,
+            predict_mode=predict_mode,
+            fushi_red=fushi_red,
+            fushi_blue=fushi_blue,
+            dt_red_dan=dt_red_dan,
+            dt_red_tuo=dt_red_tuo,
+            dt_blue_dan=dt_blue_dan,
+            dt_blue_tuo=dt_blue_tuo,
         )
         self.auto_predict_thread.log_signal.connect(self.update_log)
         self.auto_predict_thread.step_signal.connect(lambda s: self.statusBar().showMessage(s))
@@ -1889,7 +1927,7 @@ class LotteryPredictorApp(QMainWindow):
             
         # 获取当前选择
         lottery_index = self.lottery_combo.currentIndex()
-        lottery_keys = list(name_path.keys())
+        lottery_keys = ['ssq', 'dlt']  # 必须与 UI 顺序一致
         lottery_type = lottery_keys[lottery_index]
         lottery_name = name_path[lottery_type]['name']
         num_predictions = self.prediction_spin.value()
@@ -2124,7 +2162,7 @@ class LotteryPredictorApp(QMainWindow):
         
         # 从控件读取参数
         lottery_index = self.bt_lottery_combo.currentIndex()
-        lottery_keys = list(name_path.keys())
+        lottery_keys = ['ssq', 'dlt']  # 必须与 UI 顺序一致
         lottery_type = lottery_keys[lottery_index]
         model_type = self.bt_model_combo.currentData()
         periods = self.bt_periods_spin.value() or None
@@ -2450,7 +2488,7 @@ class LotteryPredictorApp(QMainWindow):
             if sender == self.analysis_suggestion_button:
                 # 数据分析页面：用 analysis_combo
                 selected_index = self.analysis_combo.currentIndex()
-                selected_key = list(name_path.keys())[selected_index]
+                selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
                 lottery_type = selected_key
             elif sender == self.adv_stats_suggestion_button:
                 # 高级统计页面：用 advanced_stats_lottery_combo (显示名"双色球"/"大乐透")
@@ -2461,7 +2499,7 @@ class LotteryPredictorApp(QMainWindow):
             else:
                 # 兜底：主界面
                 selected_index = self.lottery_combo.currentIndex()
-                selected_key = list(name_path.keys())[selected_index]
+                selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
                 lottery_type = selected_key
             
             lottery_name = name_path[lottery_type]['name']
@@ -2671,7 +2709,7 @@ class LotteryPredictorApp(QMainWindow):
     def generate_ev_prediction(self):
         """使用期望值模型生成预测"""
         selected_index = self.ev_lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
         lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
         num_predictions = self.ev_prediction_spin.value()
@@ -2812,7 +2850,7 @@ class LotteryPredictorApp(QMainWindow):
     def train_ev_model(self):
         """训练期望值模型"""
         selected_index = self.ev_lottery_combo.currentIndex()
-        selected_key = list(name_path.keys())[selected_index]
+        selected_key = ['ssq', 'dlt'][selected_index]  # 必须与 UI 顺序一致
         lottery_type = selected_key
         lottery_name = name_path[selected_key]['name']
         

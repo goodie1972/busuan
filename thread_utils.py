@@ -329,7 +329,9 @@ class AutoPredictThread(QThread):
     predictions_signal = pyqtSignal(object)  # 结构化预测列表 [(red, blue), ...]，供主线程存档
 
     def __init__(self, lottery_type, model_type='gbdt', num_predictions=3,
-                 use_gpu=False, skip_fetch=False, skip_train=False):
+                 use_gpu=False, skip_fetch=False, skip_train=False,
+                 predict_mode="单式", fushi_red=0, fushi_blue=0,
+                 dt_red_dan=0, dt_red_tuo=0, dt_blue_dan=0, dt_blue_tuo=0):
         super().__init__()
         self.lottery_type = lottery_type
         self.model_type = model_type
@@ -337,6 +339,13 @@ class AutoPredictThread(QThread):
         self.use_gpu = use_gpu
         self.skip_fetch = skip_fetch
         self.skip_train = skip_train
+        self.predict_mode = predict_mode
+        self.fushi_red = fushi_red
+        self.fushi_blue = fushi_blue
+        self.dt_red_dan = dt_red_dan
+        self.dt_red_tuo = dt_red_tuo
+        self.dt_blue_dan = dt_blue_dan
+        self.dt_blue_tuo = dt_blue_tuo
         self.should_terminate = False
 
     def run(self):
@@ -418,9 +427,10 @@ class AutoPredictThread(QThread):
                 self.finished_signal.emit(False, "")
                 return
 
-            # ===== 第3步：生成预测 =====
+            # ===== 第3步：生成预测（根据模式选择） =====
             self.step_signal.emit("正在生成预测...")
-            self.log_signal.emit(f"═══ 第3步/3: 生成{self.num_predictions}组预测 ═══")
+            mode_label = self.predict_mode
+            self.log_signal.emit(f"═══ 第3步/3: 生成{mode_label}预测 ═══")
 
             from scripts.data_analysis import load_lottery_data
             df = load_lottery_data(self.lottery_type)
@@ -437,29 +447,89 @@ class AutoPredictThread(QThread):
                 return
 
             import pandas as pd
-            # 取最近 feature_window 期做输入
             feature_window = getattr(ml_model, 'feature_window', 10)
             recent = df.sort_values('期数', ascending=False).head(feature_window)
             recent = recent.sort_values('期数', ascending=True)
 
             lottery_name = name_path[self.lottery_type]['name']
-            result_lines = [f"【一键智能预测】{lottery_name} · {MODEL_TYPES.get(self.model_type, self.model_type)}"]
-            result_lines.append(f"基于最新 {len(df)} 条历史数据，生成 {self.num_predictions} 组预测：\n")
+            result_lines = [f"【一键预测】{lottery_name} · {MODEL_TYPES.get(self.model_type, self.model_type)} · {mode_label}"]
+            result_lines.append(f"基于最新 {len(df)} 条历史数据：\n")
 
             all_predictions = []
-            for i in range(self.num_predictions):
-                red, blue = ml_model.predict(recent, variation=i)
-                if self.lottery_type == 'dlt':
-                    line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {' '.join(f'{n:02d}' for n in blue)}"
-                else:
-                    line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {blue[0]:02d}"
-                result_lines.append(line)
-                # 收集按号码对齐的概率列表（全类别字典在此转换，供校准使用）
-                rp = getattr(ml_model, 'last_red_proba', None)
-                bp = getattr(ml_model, 'last_blue_proba', None)
-                red_proba = ([float(rp.get(int(n) - 1, 0.0)) for n in red] if isinstance(rp, dict) else None)
-                blue_proba = ([float(bp.get(int(n) - 1, 0.0)) for n in blue] if isinstance(bp, dict) else None)
-                all_predictions.append((list(red), list(blue), red_proba, blue_proba))
+
+            if self.predict_mode == "复式":
+                # 复式预测
+                f_red = self.fushi_red if self.fushi_red >= ml_model.red_count else ml_model.red_count + 2
+                f_blue = self.fushi_blue if self.fushi_blue >= ml_model.blue_count else ml_model.blue_count + 1
+                red_numbers, blue_numbers = ml_model.predict_fushi(recent, red_count=f_red, blue_count=f_blue)
+                if not red_numbers or not blue_numbers:
+                    self.finished_signal.emit(False, "复式预测失败")
+                    return
+                red_numbers = [int(r) for r in red_numbers]
+                blue_numbers = [int(b) for b in blue_numbers]
+                result_lines.append(f"【复式】红球{len(red_numbers)}选{ml_model.red_count} + 蓝球{len(blue_numbers)}选{ml_model.blue_count}")
+                result_lines.append(f"  红球: {' '.join(f'{n:02d}' for n in red_numbers)}")
+                result_lines.append(f"  蓝球: {' '.join(f'{n:02d}' for n in blue_numbers)}")
+                # 生成所有组合
+                from itertools import combinations
+                red_combos = list(combinations(red_numbers, ml_model.red_count))
+                blue_combos = list(combinations(blue_numbers, ml_model.blue_count))
+                total_combos = len(red_combos) * len(blue_combos)
+                result_lines.append(f"  总注数: {total_combos}注 ({len(red_combos)}×{len(blue_combos)})")
+                result_lines.append(f"  注金额: {total_combos * 2}元")
+                # 取前N组存档
+                count = min(self.num_predictions, total_combos)
+                for i in range(count):
+                    rc = red_combos[i % len(red_combos)]
+                    bc = blue_combos[i % len(blue_combos)]
+                    all_predictions.append((list(rc), list(bc), None, None))
+
+            elif self.predict_mode == "胆拖":
+                # 胆拖预测
+                d_red_dan = self.dt_red_dan if self.dt_red_dan >= 1 else ml_model.red_count // 2
+                d_red_tuo = self.dt_red_tuo if self.dt_red_tuo >= ml_model.red_count - d_red_dan else ml_model.red_count + 1
+                d_blue_dan = self.dt_blue_dan
+                d_blue_tuo = self.dt_blue_tuo if self.dt_blue_tuo >= ml_model.blue_count else ml_model.blue_count + 1
+                r_dan, b_dan, r_tuo, b_tuo, all_combos = ml_model.predict_dantuo(
+                    recent,
+                    red_dan_count=d_red_dan, red_tuo_count=d_red_tuo,
+                    blue_dan_count=d_blue_dan, blue_tuo_count=d_blue_tuo
+                )
+                if not all_combos:
+                    self.finished_signal.emit(False, "胆拖预测失败")
+                    return
+                r_dan = [int(x) for x in r_dan]
+                b_dan = [int(x) for x in b_dan]
+                r_tuo = [int(x) for x in r_tuo]
+                b_tuo = [int(x) for x in b_tuo]
+                result_lines.append(f"【胆拖】红胆{len(r_dan)}+红拖{len(r_tuo)} 蓝胆{len(b_dan)}+蓝拖{len(b_tuo)}")
+                result_lines.append(f"  红胆: {' '.join(f'{n:02d}' for n in r_dan)}")
+                result_lines.append(f"  红拖: {' '.join(f'{n:02d}' for n in r_tuo)}")
+                if b_dan:
+                    result_lines.append(f"  蓝胆: {' '.join(f'{n:02d}' for n in b_dan)}")
+                result_lines.append(f"  蓝拖: {' '.join(f'{n:02d}' for n in b_tuo)}")
+                result_lines.append(f"  总注数: {len(all_combos)}注")
+                result_lines.append(f"  注金额: {len(all_combos) * 2}元")
+                # 取前N组存档
+                count = min(self.num_predictions, len(all_combos))
+                for i in range(count):
+                    red_combo, blue_combo = all_combos[i]
+                    all_predictions.append((list(red_combo), list(blue_combo), None, None))
+
+            else:
+                # 单式预测（默认）
+                for i in range(self.num_predictions):
+                    red, blue = ml_model.predict(recent, variation=i)
+                    if self.lottery_type == 'dlt':
+                        line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {' '.join(f'{n:02d}' for n in blue)}"
+                    else:
+                        line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {blue[0]:02d}"
+                    result_lines.append(line)
+                    rp = getattr(ml_model, 'last_red_proba', None)
+                    bp = getattr(ml_model, 'last_blue_proba', None)
+                    red_proba = ([float(rp.get(int(n) - 1, 0.0)) for n in red] if isinstance(rp, dict) else None)
+                    blue_proba = ([float(bp.get(int(n) - 1, 0.0)) for n in blue] if isinstance(bp, dict) else None)
+                    all_predictions.append((list(red), list(blue), red_proba, blue_proba))
 
             result_text = "\n".join(result_lines)
             self.log_signal.emit("预测生成完成。")
