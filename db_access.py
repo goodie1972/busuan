@@ -411,6 +411,75 @@ def get_verification_summary(lottery_type: str = None) -> Dict:
     return rows[0] if rows else {}
 
 
+def sync_csv_to_db(log_callback=None):
+    """
+    同步CSV开奖数据到数据库（只插入新期号，不覆盖已有数据）
+    
+    Args:
+        log_callback: 可选的日志回调函数
+    
+    Returns:
+        dict: {'ssq': {'inserted': n}, 'dlt': {'inserted': n}}
+    """
+    log = log_callback or print
+    import pandas as pd
+    
+    result = {}
+    for lottery_type in ['ssq', 'dlt']:
+        csv_path = f'scripts/{lottery_type}/{lottery_type}_history.csv'
+        try:
+            df = pd.read_csv(csv_path, encoding='gbk')
+        except Exception as e:
+            log(f"[ERROR] 读取{lottery_type.upper()} CSV失败: {e}")
+            result[lottery_type] = {'inserted': 0, 'error': str(e)}
+            continue
+        
+        # 获取数据库中最新期号
+        db_latest = get_latest_period(lottery_type)
+        csv_latest = int(df.iloc[0, 0])
+        
+        # 找出需要插入的新期数
+        if db_latest:
+            new_rows = df[df.iloc[:, 0] > db_latest]
+        else:
+            new_rows = df
+        
+        if len(new_rows) == 0:
+            log(f"[{lottery_type.upper()}] 数据库已是最新 (期号={db_latest})")
+            result[lottery_type] = {'inserted': 0}
+            continue
+        
+        log(f"[{lottery_type.upper()}] 发现 {len(new_rows)} 条新数据 (期号{db_latest+1 if db_latest else '?'} -> {csv_latest})")
+        
+        inserted = 0
+        for _, row in new_rows.iterrows():
+            period = int(row.iloc[0])
+            
+            if lottery_type == 'ssq':
+                red_nums = [int(row[f'红球_{i}']) for i in range(1, 7)]
+                blue_nums = [int(row['蓝球'])]
+            else:  # dlt
+                red_nums = [int(row[f'红球_{i}']) for i in range(1, 6)]
+                blue_nums = [int(row['蓝球_1']), int(row['蓝球_2'])]
+            
+            try:
+                add_lottery_draw(
+                    lottery_type=lottery_type,
+                    period=period,
+                    draw_date='',
+                    red_numbers=red_nums,
+                    blue_numbers=blue_nums
+                )
+                inserted += 1
+            except Exception as e:
+                log(f"  [ERROR] 期号{period}插入失败: {e}")
+        
+        log(f"[{lottery_type.upper()}] 成功插入 {inserted}/{len(new_rows)} 条")
+        result[lottery_type] = {'inserted': inserted}
+    
+    return result
+
+
 if __name__ == "__main__":
     # 测试数据库访问
     print("Testing database access...")

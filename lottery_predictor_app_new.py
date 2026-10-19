@@ -1754,8 +1754,25 @@ class LotteryPredictorApp(QMainWindow):
         self.update_data_button.setEnabled(True)
         self.lottery_combo.setEnabled(True)
         self.update_log("数据更新线程已结束。")
+        # 同步CSV到数据库
+        self.sync_csv_to_database()
         # 数据更新完成后自动核验所有预测记录（有开奖数据即可核验）
         self.auto_verify_after_update()
+
+    def sync_csv_to_database(self):
+        """同步CSV开奖数据到数据库"""
+        try:
+            from db_access import sync_csv_to_db
+            self.update_log("同步开奖数据到数据库...")
+            result = sync_csv_to_db(log_callback=lambda msg: self.log_emitter.new_log.emit(msg))
+            # 统计
+            total_inserted = sum(r.get('inserted', 0) for r in result.values())
+            if total_inserted > 0:
+                self.update_log(f"✓ 同步完成，新增 {total_inserted} 期开奖数据")
+            else:
+                self.update_log("✓ 数据库已是最新")
+        except Exception as e:
+            self.update_log(f"同步数据库失败: {e}")
 
     def auto_verify_after_update(self):
         """数据更新后自动核验所有待核验的预测记录（不阻塞，后台执行）"""
