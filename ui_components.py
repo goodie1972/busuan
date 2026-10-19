@@ -56,7 +56,7 @@ def create_main_tab(main_tab):
     lottery_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     lottery_combo = QComboBox()
     lottery_combo.setStyleSheet(spin_style)
-    lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
+    lottery_combo.addItems(["双色球", "大乐透"])  # 固定顺序：0=SSQ, 1=DLT
     model_label = QLabel("预测模型:")
     model_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     model_combo = QComboBox()
@@ -603,7 +603,7 @@ def create_expected_value_tab(expected_value_tab):
     
     # 彩票类型选择
     lottery_combo = QComboBox()
-    lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
+    lottery_combo.addItems(["双色球", "大乐透"])  # 固定顺序：0=SSQ, 1=DLT
     settings_layout.addRow("彩票类型:", lottery_combo)
     
     # 预测数量
@@ -736,7 +736,7 @@ def create_backtest_tab(backtest_tab):
 
     # 彩票类型选择
     lottery_combo = QComboBox()
-    lottery_combo.addItems([name_path[key]['name'] for key in name_path.keys()])
+    lottery_combo.addItems(["双色球", "大乐透"])  # 固定顺序：0=SSQ, 1=DLT
     settings_layout.addRow("彩票类型:", lottery_combo)
 
     # 模型类型选择
