@@ -229,11 +229,11 @@ def verify_records(log_callback=None, records_subset=None):
         prize_table = SSQ_PRIZE_TABLE if lt == 'ssq' else DLT_PRIZE_TABLE
         prize_name = None
         prize_amount = 0
-        for pk, pv in prize_table.items():
-            if (red_hits, blue_hits) == (pv['red'], pv['blue']):
-                prize_name = pk
-                prize_amount = pv.get('prize', 0)
-                break
+        # 奖级表的 key 就是 (red_hits, blue_hits)
+        if (red_hits, blue_hits) in prize_table:
+            prize_info = prize_table[(red_hits, blue_hits)]
+            prize_name = prize_info[0]  # 奖级名称
+            prize_amount = prize_info[1] if prize_info[1] is not None else 0
         
         # 更新数据库
         db_id = rec.get('_db_id')
