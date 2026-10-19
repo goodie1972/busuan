@@ -227,7 +227,7 @@ def verify_records(log_callback=None, records_subset=None):
         
         # 查奖级
         prize_table = SSQ_PRIZE_TABLE if lt == 'ssq' else DLT_PRIZE_TABLE
-        prize_name = None
+        prize_name = "未中奖"  # 默认未中奖
         prize_amount = 0
         # 奖级表的 key 就是 (red_hits, blue_hits)
         if (red_hits, blue_hits) in prize_table:
