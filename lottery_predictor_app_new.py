@@ -1180,12 +1180,12 @@ class LotteryPredictorApp(QMainWindow):
 
             total = len(filtered)
 
-            for i, (rec_idx, rec) in enumerate(reversed(filtered)):
+            for i, (rec_idx, rec) in enumerate(filtered):
                 row = self.records_table.rowCount()
                 self.records_table.insertRow(row)
                 self._records_row_index[row] = rec_idx
 
-                seq = total - i  # 最新记录序号最大
+                seq = i + 1  # 最新记录（i=0）序号为1
                 seq_item = QTableWidgetItem()
                 seq_item.setData(Qt.DisplayRole, seq)  # 数字显示，按数值排序
                 seq_item.setData(Qt.UserRole, rec_idx)  # 真实索引
