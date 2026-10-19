@@ -2265,6 +2265,23 @@ class LotteryMLModels:
             f"蓝胆{blue_dan_count}个+蓝拖{blue_tuo_count}个，共 {n_notes} 注（{n_notes * 2} 元）")
         return red_dan, red_tuo, blue_dan, blue_tuo
 
+    def predict_fushi(self, recent_data, red_count, blue_count):
+        """
+        复式预测的线程调用适配方法。
+        将 (red_count, blue_count) 转换为 predict_compound(extra_red, extra_blue)。
+
+        Args:
+            recent_data: 历史数据 DataFrame
+            red_count: 复式红球总数（如8）
+            blue_count: 复式蓝球总数（如2）
+
+        Returns:
+            (red_numbers, blue_numbers) 号码列表 或 (None, None)
+        """
+        extra_red = red_count - self.red_count
+        extra_blue = blue_count - self.blue_count
+        return self.predict_compound(recent_data, extra_red=extra_red, extra_blue=extra_blue)
+
     def _predict_ziwei(self, recent_data, variation=0):
         """
         紫微斗数预测 - 调用 astrology.ziwei 引擎
