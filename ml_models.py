@@ -547,6 +547,16 @@ def _class_proba_dict(model, X_scaled):
             if inner is None or inner is base:
                 break
             base = inner
+        
+        # 多标签模型：直接使用 predict_proba
+        if isinstance(model, (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel,
+                              WrappedMultilabelXGBoostModel, WrappedMultilabelGBDTModel,
+                              WrappedMultilabelCatBoostModel)):
+            row = np.asarray(model.predict_proba(X_scaled))
+            if row.ndim == 2:
+                row = row[0]
+                return {i: float(row[i]) for i in range(len(row))}
+        
         # sklearn 系分类器：classes_ + predict_proba（概率列顺序=classes_）
         classes = getattr(model, 'classes_', None)
         if classes is not None and hasattr(model, 'predict_proba'):
@@ -2508,7 +2518,13 @@ class LotteryMLModels:
 
             # ---- 获取全号码概率排序 ----
             # 检测是否是新的多标签模型
-            if isinstance(self.models['red'], (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel)):
+            if isinstance(self.models['red'], (
+                WrappedMultilabelLightGBMModel,
+                WrappedMultilabelRandomForestModel,
+                WrappedMultilabelXGBoostModel,
+                WrappedMultilabelGBDTModel,
+                WrappedMultilabelCatBoostModel
+            )):
                 # 新模型：直接使用predict_proba
                 red_proba_array = self.models['red'].predict_proba(X_scaled)[0]  # (n_classes,)
                 blue_proba_array = self.models['blue'].predict_proba(X_scaled)[0]
