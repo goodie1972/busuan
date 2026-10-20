@@ -1,0 +1,186 @@
+
+class WrappedMultilabelXGBoostModel:
+    """
+    多标签XGBoost包装器：为每个号码训练一个二分类XGBoost
+    """
+    def __init__(self, classifiers, ball_type, num_balls):
+        """
+        Args:
+            classifiers: list of xgboost.Booster，每个对应一个号码
+            ball_type: 'red' 或 'blue'
+            num_balls: 需要选择的号码数量（红5蓝2）
+        """
+        self.classifiers = classifiers
+        self.ball_type = ball_type
+        self.num_balls = num_balls
+        self.n_classes = len(classifiers)
+    
+    def predict(self, data):
+        """预测：返回概率最高的num_balls个号码（1-based）"""
+        import xgboost as xgb
+        
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+            single_sample = True
+        else:
+            single_sample = False
+        
+        dmatrix = xgb.DMatrix(data)
+        predictions = []
+        
+        for sample_idx in range(data.shape[0]):
+            # 获取每个号码的预测概率
+            probas = []
+            for clf in self.classifiers:
+                # XGBoost返回(n_samples, 2)，第2列是正类概率
+                proba_matrix = clf.predict(dmatrix)
+                if proba_matrix.ndim == 1:
+                    # 单类输出，需要转换
+                    proba = proba_matrix[sample_idx]
+                else:
+                    proba = proba_matrix[sample_idx, 1] if proba_matrix.shape[1] > 1 else proba_matrix[sample_idx, 0]
+                probas.append(proba)
+            
+            probas = np.array(probas)
+            
+            # 选出概率最高的num_balls个
+            top_indices = np.argsort(probas)[-self.num_balls:][::-1]
+            top_numbers = sorted([int(idx) + 1 for idx in top_indices])
+            
+            predictions.append(top_numbers)
+        
+        return predictions[0] if single_sample else predictions
+    
+    def predict_proba(self, data):
+        """返回所有号码的预测概率"""
+        import xgboost as xgb
+        
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+        
+        dmatrix = xgb.DMatrix(data)
+        n_samples = data.shape[0]
+        all_probas = np.zeros((n_samples, self.n_classes))
+        
+        for ball_idx, clf in enumerate(self.classifiers):
+            proba_matrix = clf.predict(dmatrix)
+            if proba_matrix.ndim == 1:
+                all_probas[:, ball_idx] = proba_matrix
+            else:
+                all_probas[:, ball_idx] = proba_matrix[:, 1] if proba_matrix.shape[1] > 1 else proba_matrix[:, 0]
+        
+        return all_probas
+
+
+class WrappedMultilabelGBDTModel:
+    """
+    多标签GBDT包装器（基于sklearn的MultiOutputClassifier）
+    """
+    def __init__(self, model, ball_type, num_balls):
+        self.model = model  # MultiOutputClassifier实例
+        self.ball_type = ball_type
+        self.num_balls = num_balls
+        self.n_classes = len(model.estimators_)
+    
+    def predict(self, data):
+        """预测：返回概率最高的num_balls个号码"""
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+            single_sample = True
+        else:
+            single_sample = False
+        
+        # 获取概率
+        probas_list = self.model.predict_proba(data)
+        
+        predictions = []
+        for sample_idx in range(data.shape[0]):
+            # 提取每个号码的正类概率
+            probas = np.array([proba[sample_idx, 1] for proba in probas_list])
+            
+            # 选出概率最高的num_balls个
+            top_indices = np.argsort(probas)[-self.num_balls:][::-1]
+            top_numbers = sorted([int(idx) + 1 for idx in top_indices])
+            
+            predictions.append(top_numbers)
+        
+        return predictions[0] if single_sample else predictions
+    
+    def predict_proba(self, data):
+        """返回所有号码的预测概率"""
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+        
+        probas_list = self.model.predict_proba(data)
+        
+        # 转为 (n_samples, n_classes) 格式
+        n_samples = data.shape[0]
+        all_probas = np.zeros((n_samples, self.n_classes))
+        
+        for ball_idx, proba in enumerate(probas_list):
+            all_probas[:, ball_idx] = proba[:, 1]  # 取正类概率
+        
+        return all_probas
+
+
+class WrappedMultilabelCatBoostModel:
+    """
+    多标签CatBoost包装器：为每个号码训练一个二分类CatBoost
+    """
+    def __init__(self, classifiers, ball_type, num_balls):
+        """
+        Args:
+            classifiers: list of CatBoostClassifier，每个对应一个号码
+            ball_type: 'red' 或 'blue'
+            num_balls: 需要选择的号码数量（红5蓝2）
+        """
+        self.classifiers = classifiers
+        self.ball_type = ball_type
+        self.num_balls = num_balls
+        self.n_classes = len(classifiers)
+    
+    def predict(self, data):
+        """预测：返回概率最高的num_balls个号码（1-based）"""
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+            single_sample = True
+        else:
+            single_sample = False
+        
+        predictions = []
+        
+        for sample_idx in range(data.shape[0]):
+            sample_data = data[sample_idx:sample_idx+1]
+            
+            # 获取每个号码的预测概率
+            probas = []
+            for clf in self.classifiers:
+                # CatBoost的predict_proba返回(n_samples, 2)
+                proba_matrix = clf.predict_proba(sample_data)
+                proba = proba_matrix[0, 1]  # 正类概率
+                probas.append(proba)
+            
+            probas = np.array(probas)
+            
+            # 选出概率最高的num_balls个
+            top_indices = np.argsort(probas)[-self.num_balls:][::-1]
+            top_numbers = sorted([int(idx) + 1 for idx in top_indices])
+            
+            predictions.append(top_numbers)
+        
+        return predictions[0] if single_sample else predictions
+    
+    def predict_proba(self, data):
+        """返回所有号码的预测概率"""
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+        
+        n_samples = data.shape[0]
+        all_probas = np.zeros((n_samples, self.n_classes))
+        
+        for ball_idx, clf in enumerate(self.classifiers):
+            proba_matrix = clf.predict_proba(data)
+            all_probas[:, ball_idx] = proba_matrix[:, 1]  # 取正类概率
+        
+        return all_probas
+
