@@ -56,3 +56,4 @@ old_predictions_backup.json
 busuan.db-journal
 busuan.db-wal
 busuan.db-shm
+busuan.db
