@@ -182,14 +182,13 @@ def create_main_tab(main_tab):
         # 红胆上限 = 单式红球数 - 1；红拖上限 = 红球范围 - 红胆
         dt_red_dan.setRange(1, max(1, red_cnt - 1))
         dt_red_tuo.setRange(1, red_range)
-        # 蓝胆：单式蓝球数 >= 2 才有胆拖空间，否则固定 0 并禁用
+        # 蓝胆：单式蓝球数 >= 2 才有胆拖空间，否则禁用但保留之前的值
         if blue_cnt >= 2:
             dt_blue_dan.setRange(0, blue_cnt - 1)
             dt_blue_dan.setEnabled(True)
             dt_blue_dan.setToolTip(f"蓝球胆码个数(0-{blue_cnt - 1}，0=不要蓝胆)")
         else:
             dt_blue_dan.setRange(0, 0)
-            dt_blue_dan.setValue(0)
             dt_blue_dan.setEnabled(False)
             dt_blue_dan.setToolTip("该彩票蓝球单式只选1个，不支持蓝胆")
         dt_blue_tuo.setRange(1, blue_range)
