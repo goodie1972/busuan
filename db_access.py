@@ -203,6 +203,46 @@ def add_prediction(lottery_type: str, model_type: str, latest_period: int,
     ))
 
 
+def add_predictions_batch(predictions: List[Dict[str, Any]]) -> int:
+    """
+    批量添加预测记录（单事务提交，避免逐条 commit）。
+
+    Args:
+        predictions: 每项为 dict，字段与 add_prediction 参数一致
+                     (lottery_type, model_type, latest_period, red_numbers,
+                      blue_numbers, red_probabilities, blue_probabilities,
+                      predict_time)
+
+    Returns:
+        int: 实际写入条数
+    """
+    if not predictions:
+        return 0
+
+    query = """
+        INSERT INTO predictions 
+        (predict_time, lottery_type, model_type, latest_period,
+         red_numbers, blue_numbers, red_probabilities, blue_probabilities)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params_list = []
+    for p in predictions:
+        params_list.append((
+            p.get('predict_time') or datetime.now().isoformat(),
+            p['lottery_type'], p['model_type'], p['latest_period'],
+            json.dumps(p['red_numbers']), json.dumps(p['blue_numbers']),
+            json.dumps(p['red_probabilities']) if p.get('red_probabilities') else None,
+            json.dumps(p['blue_probabilities']) if p.get('blue_probabilities') else None,
+        ))
+    return execute_many(query, params_list)
+
+
+def count_predictions() -> int:
+    """统计预测记录总数（不加载明细，避免批量存档时反复反序列化）"""
+    rows = execute_query("SELECT COUNT(*) AS n FROM predictions")
+    return int(rows[0]['n']) if rows else 0
+
+
 def update_prediction_verification(prediction_id: int, target_period: int,
                                   red_hits: int, blue_hits: int,
                                   prize_name: str = None, prize_amount: float = None):

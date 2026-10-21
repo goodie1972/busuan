@@ -44,9 +44,6 @@ from thread_utils import (
     AutoPredictThread, DataCheckThread,
     CalibrationThread, FeatureAnalysisThread, RetrainThread
 )
-from prediction_utils import (
-    process_predictions, randomize_numbers
-)
 from theme_manager import ThemeManager, CustomThemeDialog
 from ui_components import (
     create_main_tab, create_analysis_tab, create_advanced_statistics_tab,
@@ -689,54 +686,93 @@ class LotteryPredictorApp(QMainWindow):
                 input_dim = scaler_X.n_features_in_
                 self.log_emitter.new_log.emit(f"模型输入维度: {input_dim}")
 
+                # 用最近10期真实开奖数据构建输入（训练时按期数降序，最近一期在最前）
+                df = load_lottery_data(lottery_type)
+                if lottery_type == 'dlt':
+                    feature_cols = [c for c in df.columns if c.startswith('红球_')][:5] + \
+                                   [c for c in df.columns if c.startswith('蓝球_')][:2]
+                    red_range, blue_range = 35, 12
+                    red_count, blue_count = 5, 2
+                else:
+                    feature_cols = [c for c in df.columns if c.startswith('红球_')][:6] + \
+                                   [c for c in df.columns
+                                    if c.startswith('蓝球_') or c == '蓝球'][:1]
+                    red_range, blue_range = 33, 16
+                    red_count, blue_count = 6, 1
+
+                seq_len = 10
+                recent = df.sort_values('期数', ascending=False).head(seq_len).reset_index(drop=True)
+                if len(recent) < seq_len:
+                    raise ValueError(f"历史数据不足，需要至少 {seq_len} 期")
+                raw_input = recent[feature_cols].to_numpy(dtype=float)
+                if raw_input.shape[1] != input_dim:
+                    raise ValueError(
+                        f"特征维度不匹配: 数据 {raw_input.shape[1]} 维，模型需要 {input_dim} 维")
+                scaled_input = scaler_X.transform(raw_input).reshape(1, seq_len, input_dim)
+                scaled_input = torch.tensor(scaled_input, dtype=torch.float32)
+
+                def normalize_lstm_numbers(sampled, emissions, number_range, count):
+                    """去重并按CRF发射分数补足，输出确定的升序号码。"""
+                    scores = emissions[0].detach().cpu().numpy().mean(axis=0)
+                    numbers = []
+                    for idx in sampled[:count]:
+                        num = int(idx) + 1
+                        if 1 <= num <= number_range and num not in numbers:
+                            numbers.append(num)
+                    if len(numbers) < count:
+                        for idx in np.argsort(-scores):
+                            num = int(idx) + 1
+                            if 1 <= num <= number_range and num not in numbers:
+                                numbers.append(num)
+                                if len(numbers) == count:
+                                    break
+                    return sorted(numbers[:count])
+
                 for i in range(num_predictions):
                     with torch.no_grad():
-                        # 生成随机输入并进行缩放
-                        random_input = np.random.normal(0, 1, (1, 10, input_dim))  # 使用10作为序列长度
-                        random_input_reshaped = random_input.reshape(-1, input_dim)
-                        scaled_input = scaler_X.transform(random_input_reshaped)
-                        scaled_input = scaled_input.reshape(1, 10, input_dim)
-                        scaled_input = torch.tensor(scaled_input, dtype=torch.float32)
-
                         # 红球预测
-                        red_lstm_out = red_model.lstm(scaled_input)
-                        red_fc_out = red_model.fc(red_lstm_out[0])
-                        red_emissions = red_fc_out.view(-1, red_model.output_seq_length, red_model.output_dim)
-                        red_mask = torch.ones(red_emissions.size()[:2], dtype=torch.uint8)
-                        red_sampled_sequences = sample_crf_sequences(red_model.crf, red_emissions, red_mask, num_samples=1, temperature=1.0)
+                        red_lstm_out, _ = red_model.lstm(scaled_input)
+                        red_fc_out = red_model.fc(red_lstm_out[:, -1, :])
+                        red_emissions = red_fc_out.view(
+                            -1, red_model.output_seq_length, red_model.output_dim)
+                        red_mask = torch.ones(red_emissions.size()[:2], dtype=torch.bool)
+                        red_sampled_sequences = sample_crf_sequences(
+                            red_model.crf, red_emissions, red_mask,
+                            num_samples=1, temperature=1.0)
 
                         if not red_sampled_sequences:
                             raise ValueError("未能生成红球预测序列。")
 
-                        red_predicted = red_sampled_sequences[0]
-
                         # 蓝球预测
-                        blue_lstm_out = blue_model.lstm(scaled_input)
-                        blue_fc_out = blue_model.fc(blue_lstm_out[0])
-                        blue_emissions = blue_fc_out.view(-1, blue_model.output_seq_length, blue_model.output_dim)
-                        blue_mask = torch.ones(blue_emissions.size()[:2], dtype=torch.uint8)
-                        blue_sampled_sequences = sample_crf_sequences(blue_model.crf, blue_emissions, blue_mask, num_samples=1, temperature=1.0)
+                        blue_lstm_out, _ = blue_model.lstm(scaled_input)
+                        blue_fc_out = blue_model.fc(blue_lstm_out[:, -1, :])
+                        blue_emissions = blue_fc_out.view(
+                            -1, blue_model.output_seq_length, blue_model.output_dim)
+                        blue_mask = torch.ones(blue_emissions.size()[:2], dtype=torch.bool)
+                        blue_sampled_sequences = sample_crf_sequences(
+                            blue_model.crf, blue_emissions, blue_mask,
+                            num_samples=1, temperature=1.0)
 
                         if not blue_sampled_sequences:
                             raise ValueError("未能生成蓝球预测序列。")
 
-                        blue_predicted = blue_sampled_sequences[0]
+                        red_numbers = normalize_lstm_numbers(
+                            red_sampled_sequences[0], red_emissions, red_range, red_count)
+                        blue_numbers = normalize_lstm_numbers(
+                            blue_sampled_sequences[0], blue_emissions, blue_range, blue_count)
 
-                        # 处理预测结果
-                        numbers = process_predictions(red_predicted, blue_predicted, lottery_type)
-                        
-                        # 增加随机性
-                        extra_randomness = randomize_numbers(numbers, lottery_type)
-                        
-                        # 格式化显示结果
                         if lottery_type == "dlt":
-                            result_text += f"  第 {i+1} 组: {' '.join(map(str, extra_randomness[:5]))} + {' '.join(map(str, extra_randomness[5:]))}\n"
+                            result_text += (
+                                f"  第 {i+1} 组: {' '.join(map(str, red_numbers))} + "
+                                f"{' '.join(map(str, blue_numbers))}\n")
                             collected_predictions.append(
-                                (list(extra_randomness[:5]), list(extra_randomness[5:])))
+                                (list(red_numbers), list(blue_numbers)))
                         else:
-                            result_text += f"  第 {i+1} 组: {' '.join(map(str, extra_randomness[:6]))} + {str(extra_randomness[6])}\n"
+                            result_text += (
+                                f"  第 {i+1} 组: {' '.join(map(str, red_numbers))} + "
+                                f"{blue_numbers[0]}\n")
                             collected_predictions.append(
-                                (list(extra_randomness[:6]), [int(extra_randomness[6])]))
+                                (list(red_numbers), [int(blue_numbers[0])]))
             else:
                 # 使用机器学习模型预测
                 model_key = f"{lottery_type}_{model_type}"
@@ -747,7 +783,7 @@ class LotteryPredictorApp(QMainWindow):
                     
                     # 如果模型不存在，创建一个新实例
                     use_gpu = self.gpu_checkbox.isChecked()
-                    self.ml_models[model_key] = LotteryMLModels(
+                    ml_model = LotteryMLModels(
                         lottery_type=lottery_type, 
                         model_type=model_type,
                         log_callback=self.log_emitter.new_log.emit,  # 添加日志回调
@@ -773,13 +809,16 @@ class LotteryPredictorApp(QMainWindow):
                         if load_success:
                             self.log_emitter.new_log.emit(f"期望值模型加载成功")
                             # 将加载的模型设置到ml_models中
-                            self.ml_models[model_key].models = {'red': ev_model, 'blue': ev_model}
-                            self.ml_models[model_key].raw_models = {'expected_value_model': ev_model}
+                            ml_model.models = {'red': ev_model, 'blue': ev_model}
+                            ml_model.raw_models = {'expected_value_model': ev_model}
                         else:
                             raise ValueError(f"期望值模型加载失败，请先训练模型。")
                     else:
-                        if not self.ml_models[model_key].load_models():
+                        if not ml_model.load_models():
                             raise ValueError(f"模型{MODEL_TYPES[model_type]}尚未训练，请先训练模型。")
+                    
+                    # 仅在加载成功后才缓存，失败后下次点击可重试
+                    self.ml_models[model_key] = ml_model
                 
                 ml_model = self.ml_models[model_key]
                 self.log_emitter.new_log.emit(f"已加载 {MODEL_TYPES[model_type]} 模型 for {lottery_name}")
@@ -914,6 +953,7 @@ class LotteryPredictorApp(QMainWindow):
         """
         将本次生成的预测号码自动存档，供'历史回测'页核验。
         存档失败不影响预测结果展示。
+        分批单事务写入，避免大复式逐注 commit 导致卡顿。
         """
         try:
             if not predictions:
@@ -921,8 +961,22 @@ class LotteryPredictorApp(QMainWindow):
             # 预测时已知的最新开奖期（核验时找其后第一期）
             df = load_lottery_data(lottery_type)
             latest_period = int(df['期数'].max())
-            from prediction_records import add_prediction_record
+            from prediction_records import add_prediction_records_batch
+
+            batch = []
+            total_saved = 0
             count = None
+            batch_size = 5000
+
+            def _flush():
+                nonlocal batch, total_saved, count
+                if not batch:
+                    return
+                count = add_prediction_records_batch(
+                    lottery_type, model_type, latest_period, batch)
+                total_saved += len(batch)
+                batch = []
+
             for prediction in predictions:
                 # 处理新旧/多来源两种格式：
                 #   2元组 (red, blue) + 函数级全局概率字典（复式：所有组合共享一次概率排序）
@@ -952,12 +1006,14 @@ class LotteryPredictorApp(QMainWindow):
                 if isinstance(blue_proba, dict):
                     blue_proba = [float(blue_proba.get(int(n) - 1, 0.0)) for n in blue_nums]
 
-                count = add_prediction_record(
-                    lottery_type, model_type, latest_period,
-                    red_nums, blue_nums, red_proba, blue_proba)
+                batch.append((red_nums, blue_nums, red_proba, blue_proba))
+                if len(batch) >= batch_size:
+                    _flush()
+            _flush()
+
             if count:
                 self.log_emitter.new_log.emit(
-                    f"已存档 {len(predictions)} 注预测记录（累计 {count} 注），"
+                    f"已存档 {total_saved} 注预测记录（累计 {count} 注），"
                     f"可在'历史回测'页核验中奖情况")
         except Exception as e:
             self.log_emitter.new_log.emit(
@@ -1022,6 +1078,10 @@ class LotteryPredictorApp(QMainWindow):
                 f"紫微排盘完成: {birth_info['year']}年{birth_info['month']}月{birth_info['day']}日 "
                 f"{birth_info['hour']}时 {birth_info['city']} {birth_info['gender']} → 3组号码已生成")
         except Exception as e:
+            for red_label, blue_label, detail_label in self.zw_cards:
+                red_label.setText("红球: 排盘失败")
+                blue_label.setText("蓝球: 排盘失败")
+                detail_label.setText(f"排盘失败: {e}")
             self.log_emitter.new_log.emit(f"紫微排盘失败: {e}")
 
     def reset_ziwei(self):
@@ -1092,6 +1152,10 @@ class LotteryPredictorApp(QMainWindow):
             self.log_emitter.new_log.emit(
                 f"梅花起卦完成: {'数字起卦' if use_number else '时间起卦'} → 3组号码已生成")
         except Exception as e:
+            for red_label, blue_label, detail_label in self.mh_cards:
+                red_label.setText("红球: 起卦失败")
+                blue_label.setText("蓝球: 起卦失败")
+                detail_label.setText(f"起卦失败: {e}")
             self.log_emitter.new_log.emit(f"梅花起卦失败: {e}")
 
     def reset_meihua(self):
@@ -1629,7 +1693,7 @@ class LotteryPredictorApp(QMainWindow):
         lottery_name = name_path[selected_key]['name']
         
         try:
-            self.tab_widget.setCurrentIndex(1)
+            self.tab_widget.setCurrentIndex(self.tab_widget.indexOf(self.analysis_tab))
             
             self.chart_label.setText(f"正在加载{lottery_name}数据...")
             self.stats_text.clear()

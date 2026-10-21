@@ -22,6 +22,8 @@ from backtest import SSQ_PRIZE_TABLE, DLT_PRIZE_TABLE, _load_csv_data
 from db_access import (
     get_predictions,
     add_prediction as db_add_prediction,
+    add_predictions_batch as db_add_predictions_batch,
+    count_predictions,
     update_prediction_verification,
     get_lottery_draws,
 )
@@ -116,10 +118,47 @@ def add_prediction_record(lottery_type, model_type, latest_period,
         )
         
         # 返回累计记录数
-        records = load_records()
-        return len(records)
+        return count_predictions()
     except Exception as e:
         print(f"[ERROR] Failed to add prediction record: {e}")
+        return None
+
+
+def add_prediction_records_batch(lottery_type, model_type, latest_period,
+                                 records):
+    """
+    批量保存预测记录（单事务），避免逐条 commit 与逐条全量读取。
+
+    Args:
+        lottery_type: 'ssq' / 'dlt'
+        model_type: 模型标识
+        latest_period: 预测时已知的最新开奖期数
+        records: [(red_numbers, blue_numbers, red_probabilities, blue_probabilities), ...]
+                 概率可为 None
+
+    Returns:
+        int: 存档后的累计记录条数；存档失败返回 None
+    """
+    if not records:
+        return count_predictions()
+    try:
+        predict_time = datetime.now().isoformat(timespec='seconds')
+        payload = []
+        for red_numbers, blue_numbers, red_probabilities, blue_probabilities in records:
+            payload.append({
+                'predict_time': predict_time,
+                'lottery_type': lottery_type,
+                'model_type': str(model_type),
+                'latest_period': int(latest_period),
+                'red_numbers': [int(x) for x in red_numbers],
+                'blue_numbers': [int(x) for x in blue_numbers],
+                'red_probabilities': [float(p) for p in red_probabilities] if red_probabilities else None,
+                'blue_probabilities': [float(p) for p in blue_probabilities] if blue_probabilities else None,
+            })
+        db_add_predictions_batch(payload)
+        return count_predictions()
+    except Exception as e:
+        print(f"[ERROR] Failed to add prediction records batch: {e}")
         return None
 
 

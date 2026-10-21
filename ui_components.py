@@ -61,7 +61,7 @@ def create_main_tab(main_tab):
     model_label.setStyleSheet("font-size: 11pt; font-weight: bold;")
     model_combo = QComboBox()
     model_combo.setStyleSheet(spin_style)
-    from ml_models import MODEL_TYPES, LIGHTGBM_AVAILABLE
+    from ml_models import MODEL_TYPES, LIGHTGBM_AVAILABLE, MAX_RED_SELECTION, MAX_BLUE_SELECTION
     # Add LightGBM first if available (better performance), otherwise LSTM-CRF
     if LIGHTGBM_AVAILABLE:
         model_combo.addItem("LightGBM (默认)")
@@ -113,15 +113,15 @@ def create_main_tab(main_tab):
     compound_v = QVBoxLayout(compound_card)
     compound_v.setSpacing(6)
     compound_red_spin = QSpinBox()
-    compound_red_spin.setRange(0, 35)
+    compound_red_spin.setRange(6, MAX_RED_SELECTION)
     compound_red_spin.setValue(8)
     compound_red_spin.setStyleSheet(spin_style)
-    compound_red_spin.setToolTip("复式红球总数(如双色球填8 = 8个红球里选6)")
+    compound_red_spin.setToolTip(f"复式红球总数(如双色球填8 = 8个红球里选6)，最多{MAX_RED_SELECTION}个")
     compound_blue_spin = QSpinBox()
-    compound_blue_spin.setRange(0, 16)
+    compound_blue_spin.setRange(1, MAX_BLUE_SELECTION)
     compound_blue_spin.setValue(2)
     compound_blue_spin.setStyleSheet(spin_style)
-    compound_blue_spin.setToolTip("复式蓝球总数(如双色球填2 = 2个蓝球里选1)")
+    compound_blue_spin.setToolTip(f"复式蓝球总数(如双色球填2 = 2个蓝球里选1)，最多{MAX_BLUE_SELECTION}个")
     lbl_r = QLabel("红球数:"); lbl_r.setStyleSheet(label_style)
     lbl_b = QLabel("蓝球数:"); lbl_b.setStyleSheet(label_style)
     compound_v.addWidget(lbl_r)
@@ -147,7 +147,7 @@ def create_main_tab(main_tab):
     dt_red_tuo.setRange(1, 33)
     dt_red_tuo.setValue(6)
     dt_red_tuo.setStyleSheet(spin_style)
-    dt_red_tuo.setToolTip("红球拖码个数")
+    dt_red_tuo.setToolTip(f"红球拖码个数(红胆+红拖最多{MAX_RED_SELECTION}个)")
     dt_blue_dan = QSpinBox()
     dt_blue_dan.setRange(0, 2)
     dt_blue_dan.setValue(0)
@@ -157,7 +157,7 @@ def create_main_tab(main_tab):
     dt_blue_tuo.setRange(1, 16)
     dt_blue_tuo.setValue(2)
     dt_blue_tuo.setStyleSheet(spin_style)
-    dt_blue_tuo.setToolTip("蓝球拖码个数")
+    dt_blue_tuo.setToolTip(f"蓝球拖码个数(蓝胆+蓝拖最多{MAX_BLUE_SELECTION}个)")
     for lbl, w in [("红胆:", dt_red_dan), ("红拖:", dt_red_tuo), ("蓝胆:", dt_blue_dan), ("蓝拖:", dt_blue_tuo)]:
         l = QLabel(lbl); l.setStyleSheet(label_style)
         dantuo_v.addWidget(l)
@@ -167,21 +167,35 @@ def create_main_tab(main_tab):
 
     main_layout.addLayout(cards_layout)
 
-    # ---- 胆拖范围随彩票类型联动 ----
+    # ---- 复式/胆拖范围随彩票类型联动 ----
+    def _current_counts():
+        # combo 索引映射：0=双色球(ssq), 1=大乐透(dlt)
+        if lottery_combo.currentIndex() == 1:
+            return 5, 2
+        return 6, 1
+
+    def _sync_compound_ranges():
+        """复式号码池：下限=单式个数，上限=红16/蓝6"""
+        red_cnt, blue_cnt = _current_counts()
+        compound_red_spin.setRange(red_cnt, MAX_RED_SELECTION)
+        compound_blue_spin.setRange(blue_cnt, MAX_BLUE_SELECTION)
+
+    def _sync_dantuo_tuo_ranges():
+        """拖码范围随胆码联动：拖码下限=单式数-胆数，红胆+红拖<=16，蓝胆+蓝拖<=6"""
+        red_cnt, blue_cnt = _current_counts()
+        red_dan = max(1, min(dt_red_dan.value(), red_cnt - 1))
+        blue_dan = max(0, min(dt_blue_dan.value(), max(0, blue_cnt - 1)))
+        dt_red_tuo.setRange(red_cnt - red_dan, MAX_RED_SELECTION - red_dan)
+        dt_blue_tuo.setRange(blue_cnt - blue_dan, MAX_BLUE_SELECTION - blue_dan)
+
     def _sync_dantuo_ranges():
-        """根据彩票类型同步胆拖控件范围
+        """根据彩票类型同步胆码范围
         SSQ: 红球6选1，蓝球选1 → 红胆1-5，蓝胆固定0（不支持蓝胆）
         DLT: 红球5选2，蓝球选2 → 红胆1-4，蓝胆0-1
         """
-        # combo 索引映射：0=双色球(ssq), 1=大乐透(dlt)
-        lt_key = 'ssq' if lottery_combo.currentIndex() == 0 else 'dlt'
-        if lt_key == 'dlt':
-            red_cnt, blue_cnt, red_range, blue_range = 5, 2, 35, 12
-        else:
-            red_cnt, blue_cnt, red_range, blue_range = 6, 1, 33, 16
-        # 红胆上限 = 单式红球数 - 1；红拖上限 = 红球范围 - 红胆
+        red_cnt, blue_cnt = _current_counts()
+        # 红胆上限 = 单式红球数 - 1
         dt_red_dan.setRange(1, max(1, red_cnt - 1))
-        dt_red_tuo.setRange(1, red_range)
         # 蓝胆：单式蓝球数 >= 2 才有胆拖空间，否则禁用但保留之前的值
         if blue_cnt >= 2:
             dt_blue_dan.setRange(0, blue_cnt - 1)
@@ -191,14 +205,13 @@ def create_main_tab(main_tab):
             dt_blue_dan.setRange(0, 0)
             dt_blue_dan.setEnabled(False)
             dt_blue_dan.setToolTip("该彩票蓝球单式只选1个，不支持蓝胆")
-        dt_blue_tuo.setRange(1, blue_range)
-        # 修正当前值超范围
-        if dt_red_dan.value() > dt_red_dan.maximum():
-            dt_red_dan.setValue(dt_red_dan.maximum())
-        if dt_blue_tuo.value() > dt_blue_tuo.maximum():
-            dt_blue_tuo.setValue(dt_blue_tuo.maximum())
+        _sync_dantuo_tuo_ranges()
 
+    dt_red_dan.valueChanged.connect(lambda _: _sync_dantuo_tuo_ranges())
+    dt_blue_dan.valueChanged.connect(lambda _: _sync_dantuo_tuo_ranges())
+    lottery_combo.currentIndexChanged.connect(lambda _: _sync_compound_ranges())
     lottery_combo.currentIndexChanged.connect(lambda _: _sync_dantuo_ranges())
+    _sync_compound_ranges()  # 初始化
     _sync_dantuo_ranges()  # 初始化
 
     # ==================== 模式互斥逻辑 ====================

@@ -60,6 +60,10 @@ if CATBOOST_AVAILABLE:
 if EXPECTED_VALUE_MODEL_AVAILABLE:
     MODEL_TYPES['expected_value'] = '期望值模型'
 
+# 复式/胆拖选号池上限：红球最多 16 个，蓝球最多 6 个
+MAX_RED_SELECTION = 16
+MAX_BLUE_SELECTION = 6
+
 
 def _augment_features_frame(df, lottery_type, red_cols, blue_cols, window=50):
     """为期数升序的完整历史DataFrame追加时序衍生特征列（增强特征模式）。
@@ -321,8 +325,11 @@ class WrappedMultilabelRandomForestModel:
         
         predictions = []
         for sample_idx in range(data.shape[0]):
-            # 提取每个号码的正类概率
-            probas = np.array([proba[sample_idx, 1] for proba in probas_list])
+            # 提取每个号码的正类概率；训练集中某号码从未开出时只有一列
+            probas = np.array([
+                proba[sample_idx, 1] if proba.shape[1] > 1 else proba[sample_idx, 0]
+                for proba in probas_list
+            ])
             
             # 选出概率最高的num_balls个
             top_indices = np.argsort(probas)[-self.num_balls:][::-1]
@@ -344,7 +351,7 @@ class WrappedMultilabelRandomForestModel:
         all_probas = np.zeros((n_samples, self.n_classes))
         
         for ball_idx, proba in enumerate(probas_list):
-            all_probas[:, ball_idx] = proba[:, 1]  # 取正类概率
+            all_probas[:, ball_idx] = proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
         
         return all_probas
 
@@ -445,8 +452,11 @@ class WrappedMultilabelGBDTModel:
         
         predictions = []
         for sample_idx in range(data.shape[0]):
-            # 提取每个号码的正类概率
-            probas = np.array([proba[sample_idx, 1] for proba in probas_list])
+            # 提取每个号码的正类概率；训练集中某号码从未开出时只有一列
+            probas = np.array([
+                proba[sample_idx, 1] if proba.shape[1] > 1 else proba[sample_idx, 0]
+                for proba in probas_list
+            ])
             
             # 选出概率最高的num_balls个
             top_indices = np.argsort(probas)[-self.num_balls:][::-1]
@@ -468,7 +478,7 @@ class WrappedMultilabelGBDTModel:
         all_probas = np.zeros((n_samples, self.n_classes))
         
         for ball_idx, proba in enumerate(probas_list):
-            all_probas[:, ball_idx] = proba[:, 1]  # 取正类概率
+            all_probas[:, ball_idx] = proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
         
         return all_probas
 
@@ -505,9 +515,9 @@ class WrappedMultilabelCatBoostModel:
             # 获取每个号码的预测概率
             probas = []
             for clf in self.classifiers:
-                # CatBoost的predict_proba返回(n_samples, 2)
+                # CatBoost的predict_proba返回(n_samples, n_classes)，取正类概率
                 proba_matrix = clf.predict_proba(sample_data)
-                proba = proba_matrix[0, 1]  # 正类概率
+                proba = proba_matrix[0, 1] if proba_matrix.shape[1] > 1 else proba_matrix[0, 0]
                 probas.append(proba)
             
             probas = np.array(probas)
@@ -530,57 +540,121 @@ class WrappedMultilabelCatBoostModel:
         
         for ball_idx, clf in enumerate(self.classifiers):
             proba_matrix = clf.predict_proba(data)
-            all_probas[:, ball_idx] = proba_matrix[:, 1]  # 取正类概率
+            all_probas[:, ball_idx] = (proba_matrix[:, 1] if proba_matrix.shape[1] > 1
+                                       else proba_matrix[:, 0])
         
         return all_probas
 
 
-def _class_proba_dict(model, X_scaled):
-    """获取模型对单样本的逐类概率 dict {类别索引(号码-1): 概率}；无概率信息时返回 None"""
+def _unwrap_model(model, max_depth=5):
+    """递归解包加载时可能出现的包装器嵌套（wrapper.model = wrapper.model = Booster）。"""
+    base = model
+    for _ in range(max_depth):
+        if not type(base).__name__.startswith('Wrapped'):
+            break
+        inner = getattr(base, 'model', None)
+        if inner is None or inner is base:
+            break
+        base = inner
+    return base
+
+
+def _proba_matrix(model, X_scaled, n_classes=None):
+    """返回 (n_samples, n_classes) 的逐类概率矩阵，列索引为0-based号码索引。
+
+    仅接受有概率输出的模型；无概率信息时返回 None。
+    """
     try:
-        # 递归解包（加载时可能出现包装器嵌套：wrapper.model = wrapper.model = Booster）
-        base = model
-        for _ in range(5):
-            if not type(base).__name__.startswith('Wrapped'):
-                break
-            inner = getattr(base, 'model', None)
-            if inner is None or inner is base:
-                break
-            base = inner
-        
-        # 多标签模型：直接使用 predict_proba
+        X_scaled = np.asarray(X_scaled)
+        if X_scaled.ndim == 1:
+            X_scaled = X_scaled.reshape(1, -1)
+
+        # 多标签模型：predict_proba 已返回完整号码概率矩阵
         if isinstance(model, (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel,
                               WrappedMultilabelXGBoostModel, WrappedMultilabelGBDTModel,
                               WrappedMultilabelCatBoostModel)):
-            row = np.asarray(model.predict_proba(X_scaled))
-            if row.ndim == 2:
-                row = row[0]
-                return {i: float(row[i]) for i in range(len(row))}
-        
+            matrix = np.asarray(model.predict_proba(X_scaled))
+            if matrix.ndim == 1:
+                matrix = matrix.reshape(1, -1)
+            return matrix
+
         # sklearn 系分类器：classes_ + predict_proba（概率列顺序=classes_）
-        classes = getattr(model, 'classes_', None)
-        if classes is not None and hasattr(model, 'predict_proba'):
-            row = np.asarray(model.predict_proba(X_scaled))
-            if row.ndim == 2:
-                row = row[0]
-                return {int(c): float(row[i]) for i, c in enumerate(classes) if i < len(row)}
+        base = _unwrap_model(model)
+        for candidate in (model, base):
+            classes = getattr(candidate, 'classes_', None)
+            if classes is None or not hasattr(candidate, 'predict_proba'):
+                continue
+            proba = np.asarray(candidate.predict_proba(X_scaled))
+            if proba.ndim == 1:
+                proba = proba.reshape(1, -1)
+            classes = [int(c) for c in np.asarray(classes).ravel()]
+            if n_classes is None:
+                n_classes = (max(classes) + 1) if classes else proba.shape[1]
+            matrix = np.zeros((proba.shape[0], int(n_classes)))
+            for i, cls in enumerate(classes):
+                if 0 <= cls < matrix.shape[1] and i < proba.shape[1]:
+                    matrix[:, cls] = proba[:, i]
+            return matrix
+
         # lightgbm / xgboost Booster（无 classes_、predict 直接返回概率矩阵）
-        # 注意: 必须用解包后的 base 调用，包装器 predict 会经 process_prediction 转成类别索引
+        # 注意: 必须用解包后的 base 调用，包装器 predict 会转成类别索引
         if 'Booster' in type(base).__name__:
             if 'XGB' in type(base).__name__:
                 try:
                     import xgboost as xgb
-                    row = np.asarray(base.predict(xgb.DMatrix(X_scaled)))
+                    proba = np.asarray(base.predict(xgb.DMatrix(X_scaled)))
                 except Exception:
-                    row = np.asarray(base.predict(X_scaled))
+                    proba = np.asarray(base.predict(X_scaled))
             else:
-                row = np.asarray(base.predict(X_scaled))
-            if row.ndim == 2:
-                row = row[0]
-                return {i: float(row[i]) for i in range(len(row))}
+                proba = np.asarray(base.predict(X_scaled))
+            if proba.ndim == 1:
+                proba = proba.reshape(-1, 1)
+            return proba
     except Exception:
         pass
     return None
+
+
+def _class_proba_dict(model, X_scaled):
+    """获取模型对单样本的逐类概率 dict {类别索引(号码-1): 概率}；无概率信息时返回 None"""
+    matrix = _proba_matrix(model, X_scaled)
+    if matrix is None or matrix.shape[0] == 0:
+        return None
+    row = matrix[0]
+    return {i: float(row[i]) for i in range(len(row))}
+
+
+def _ensemble_proba_matrix(models_dict, X_scaled, weights=None, n_classes=None):
+    """集成模型：对各子模型概率矩阵(加权)平均，返回列索引为0-based号码索引的矩阵。"""
+    sums = None
+    total_w = 0.0
+    for name, model in models_dict.items():
+        matrix = _proba_matrix(model, X_scaled, n_classes=n_classes)
+        if matrix is None:
+            continue
+        if n_classes is not None:
+            if matrix.shape[1] < n_classes:
+                matrix = np.pad(matrix, ((0, 0), (0, n_classes - matrix.shape[1])))
+            elif matrix.shape[1] > n_classes:
+                matrix = matrix[:, :n_classes]
+        w = 1.0
+        if weights:
+            try:
+                w = float(weights.get(name, 1.0)) or 1.0
+            except (TypeError, ValueError):
+                w = 1.0
+        if sums is None:
+            sums = matrix * w
+        else:
+            if matrix.shape[1] != sums.shape[1]:
+                cols = max(matrix.shape[1], sums.shape[1])
+                sums = np.pad(sums, ((0, 0), (0, cols - sums.shape[1])))
+                matrix = np.pad(matrix, ((0, 0), (0, cols - matrix.shape[1])))
+            sums = sums + matrix * w
+        total_w += w
+    if sums is None or total_w <= 0:
+        return None
+    return sums / total_w
 
 
 def _ensemble_proba_dict(models_dict, X_scaled, weights=None):
@@ -589,27 +663,11 @@ def _ensemble_proba_dict(models_dict, X_scaled, weights=None):
     weights: 可选 {子模型名: 权重}，由 model_weights 模块基于前向核验表现计算；
     缺省或子模型名不在表中时按等权(1.0)，与旧行为一致。
     """
-    sums = None
-    total_w = 0.0
-    for name, model in models_dict.items():
-        d = _class_proba_dict(model, X_scaled)
-        if not d:
-            continue
-        w = 1.0
-        if weights:
-            try:
-                w = float(weights.get(name, 1.0)) or 1.0
-            except (TypeError, ValueError):
-                w = 1.0
-        if sums is None:
-            sums = {k: v * w for k, v in d.items()}
-        else:
-            for k, v in d.items():
-                sums[k] = sums.get(k, 0.0) + v * w
-        total_w += w
-    if sums is None or total_w <= 0:
+    matrix = _ensemble_proba_matrix(models_dict, X_scaled, weights=weights)
+    if matrix is None or matrix.shape[0] == 0:
         return None
-    return {k: v / total_w for k, v in sums.items()}
+    row = matrix[0]
+    return {i: float(row[i]) for i in range(len(row))}
 
 
 def _mean_confidence(proba_map, numbers):
@@ -652,7 +710,13 @@ class LotteryMLModels:
         
      
         self.raw_models = {}
-        
+        self.eval_metrics = None
+        self.data_split = None
+        self._full_X_raw = None
+        self._full_y_red = None
+        self._full_y_blue = None
+        self._full_history_cache = None
+        self._full_history_mtime = None        
    
         self.logger = logging.getLogger(f"ml_models_{lottery_type}")
         self.logger.setLevel(logging.INFO)
@@ -694,19 +758,29 @@ class LotteryMLModels:
             self.log_callback(message)
     
     def _load_full_history(self, df):
-        """增强模式训练入口的完整历史保障：
+        """增强模式训练/预测入口的完整历史保障：
         调用方传的可能只是尾部窗口切片，若行数不足以暖机(<=200)则从本地CSV补全。
-        已足够时原样返回，不重复IO。"""
+        已足够时原样返回，不重复IO；CSV按mtime缓存，避免每次预测重复读取。"""
         try:
             if df is not None and len(df) > 200:
                 return df
             from backtest import _load_csv_data
-            full = _load_csv_data(self.lottery_type)
+            csv_path = f'./scripts/{self.lottery_type}/{self.lottery_type}_history.csv'
+            try:
+                mtime = os.path.getmtime(csv_path)
+            except OSError:
+                mtime = None
+            full = self._full_history_cache
+            if full is None or mtime != self._full_history_mtime:
+                full = _load_csv_data(self.lottery_type)
+                self._full_history_cache = full
+                self._full_history_mtime = mtime
             if full is not None and len(full) > 200:
-                self.log(f"增强模式: 训练切片仅{0 if df is None else len(df)}期，已改用完整历史 {len(full)} 期")
+                self.log(f"完整历史补全: 输入切片{0 if df is None else len(df)}期，"
+                         f"改用完整历史 {len(full)} 期")
                 return full
         except Exception as e:
-            self.log(f"增强模式补全历史失败(用原数据): {e}")
+            self.log(f"完整历史补全失败(用原数据): {e}")
         return df
 
     def prepare_data(self, df, test_size=0.2):
@@ -810,53 +884,55 @@ class LotteryMLModels:
         # 保存特征维度，用于预测时的兼容性检查
         self.expected_feature_count = X_reshaped.shape[1]
         self.log(f"特征维度: {self.expected_feature_count}")
-        
-        # 数据标准化，仅对输入特征进行处理，不对标签进行处理
+
+        # 多标签编码：每个号码一列，1=当期开出
+        n_samples = len(y_red)
+        y_red_multilabel = np.zeros((n_samples, self.red_range), dtype=int)
+        y_blue_multilabel = np.zeros((n_samples, self.blue_range), dtype=int)
+        for i in range(n_samples):
+            for ball_idx in y_red[i]:
+                ball_idx = int(ball_idx)
+                if 0 <= ball_idx < self.red_range:
+                    y_red_multilabel[i, ball_idx] = 1
+            for ball_idx in y_blue[i]:
+                ball_idx = int(ball_idx)
+                if 0 <= ball_idx < self.blue_range:
+                    y_blue_multilabel[i, ball_idx] = 1
+
+        if n_samples < 2:
+            self.log(f"样本不足({n_samples})，无法拆分训练/测试集")
+            return None, None, None, None, None, None
+
+        # 时间序列必须按时间顺序拆分：测试集取最近一段，不能随机打乱
+        n_test = max(1, min(int(n_samples * test_size), n_samples - 1))
+        n_train = n_samples - n_test
+        X_train_raw = X_reshaped[:n_train]
+        X_test_raw = X_reshaped[n_train:]
+
+        # 缩放器只能在训练集上拟合，避免测试集信息泄漏到训练过程
         scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_reshaped)
-        
-        # 保存缩放器以便预测时使用
+        X_train = scaler.fit_transform(X_train_raw)
+        X_test = scaler.transform(X_test_raw)
         self.scalers['X'] = scaler
+
+        # 保留全量数据，评估结束后用全部历史重新拟合部署模型
+        self._full_X_raw = X_reshaped
+        self._full_y_red = y_red_multilabel
+        self._full_y_blue = y_blue_multilabel
+        self.data_split = {
+            'method': 'chronological',
+            'total_samples': int(n_samples),
+            'train_samples': int(n_train),
+            'test_samples': int(n_test),
+            'test_size': float(test_size),
+        }
+
+        y_red_multilabel_train = y_red_multilabel[:n_train]
+        y_red_multilabel_test = y_red_multilabel[n_train:]
+        y_blue_multilabel_train = y_blue_multilabel[:n_train]
+        y_blue_multilabel_test = y_blue_multilabel[n_train:]
         
-        # 拆分训练集和测试集
-        X_train, X_test, y_red_train, y_red_test, y_blue_train, y_blue_test = train_test_split(
-            X_scaled, y_red, y_blue, test_size=test_size, random_state=42
-        )
-        
-        # ====== 多标签分类格式：将位置索引转为one-hot编码 ======
-        # y_red: (n_samples, red_count) 每列是一个位置的号码索引(0-based)
-        # 转为: (n_samples, red_range) 每列表示该号码是否被选中(0/1)
-        
-        n_samples = y_red_train.shape[0]
-        
-        # 红球多标签
-        y_red_multilabel_train = np.zeros((n_samples, self.red_range), dtype=int)
-        for i in range(n_samples):
-            for ball_idx in y_red_train[i]:
-                if 0 <= ball_idx < self.red_range:
-                    y_red_multilabel_train[i, ball_idx] = 1
-        
-        # 蓝球多标签
-        y_blue_multilabel_train = np.zeros((n_samples, self.blue_range), dtype=int)
-        for i in range(n_samples):
-            for ball_idx in y_blue_train[i]:
-                if 0 <= ball_idx < self.blue_range:
-                    y_blue_multilabel_train[i, ball_idx] = 1
-        
-        # 测试集同样转换
-        n_test = y_red_test.shape[0]
-        y_red_multilabel_test = np.zeros((n_test, self.red_range), dtype=int)
-        for i in range(n_test):
-            for ball_idx in y_red_test[i]:
-                if 0 <= ball_idx < self.red_range:
-                    y_red_multilabel_test[i, ball_idx] = 1
-        
-        y_blue_multilabel_test = np.zeros((n_test, self.blue_range), dtype=int)
-        for i in range(n_test):
-            for ball_idx in y_blue_test[i]:
-                if 0 <= ball_idx < self.blue_range:
-                    y_blue_multilabel_test[i, ball_idx] = 1
-        
+        self.log(f"时间顺序拆分: 训练 {n_train} 条(较早), 测试 {n_test} 条(最近)")
         self.log(f"训练集特征形状: {X_train.shape}")
         self.log(f"多标签训练集: 红球{y_red_multilabel_train.shape}, 蓝球{y_blue_multilabel_train.shape}")
         
@@ -1243,6 +1319,48 @@ class LotteryMLModels:
         
         return ensemble_models
     
+    def _fit_models(self, X_train, y_red_train, y_blue_train):
+        """按当前 model_type 训练红/蓝球模型，返回 {'red': ..., 'blue': ...}"""
+        models = {}
+        if self.model_type == 'random_forest':
+            self.log("\n----- 使用随机森林模型 -----")
+            models['red'] = self.train_random_forest(X_train, y_red_train, 'red')
+            models['blue'] = self.train_random_forest(X_train, y_blue_train, 'blue')
+
+        elif self.model_type == 'xgboost':
+            self.log("\n----- 使用XGBoost模型 -----")
+            models['red'] = self.train_xgboost(X_train, y_red_train, 'red')
+            models['blue'] = self.train_xgboost(X_train, y_blue_train, 'blue')
+
+        elif self.model_type == 'gbdt':
+            self.log("\n----- 使用梯度提升决策树 -----")
+            models['red'] = self.train_gbdt(X_train, y_red_train, 'red')
+            models['blue'] = self.train_gbdt(X_train, y_blue_train, 'blue')
+
+        elif self.model_type == 'lightgbm':
+            if not LIGHTGBM_AVAILABLE:
+                raise ValueError("LightGBM 未安装，无法训练")
+            self.log("\n----- 使用LightGBM模型 -----")
+            models['red'] = self.train_lightgbm(X_train, y_red_train, 'red')
+            models['blue'] = self.train_lightgbm(X_train, y_blue_train, 'blue')
+
+        elif self.model_type == 'catboost':
+            if not CATBOOST_AVAILABLE:
+                raise ValueError("CatBoost 未安装，无法训练")
+            self.log("\n----- 使用CatBoost模型 -----")
+            models['red'] = self.train_catboost(X_train, y_red_train, 'red')
+            models['blue'] = self.train_catboost(X_train, y_blue_train, 'blue')
+
+        elif self.model_type == 'ensemble':
+            self.log("\n----- 使用集成模型 -----")
+            models['red'] = self.train_ensemble(X_train, y_red_train, 'red')
+            models['blue'] = self.train_ensemble(X_train, y_blue_train, 'blue')
+
+        else:
+            raise ValueError(f"未知模型类型: {self.model_type}")
+
+        return models
+
     def train(self, df):
         """训练模型"""
         self.log("============ 开始训练模型 ============")
@@ -1278,52 +1396,32 @@ class LotteryMLModels:
         self.log(f"数据准备完成，耗时: {data_prep_time:.2f}秒")
         
         self.models = {}
+        self.eval_metrics = None
         
-        self.log("\n====== 第2阶段: 模型训练 ======")
-        model_train_start = time.time()
-        
-        if self.model_type == 'random_forest':
-            self.log("\n----- 使用随机森林模型 -----")
-            self.models['red'] = self.train_random_forest(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_random_forest(X_train, y_blue_train, 'blue')
-        
-        elif self.model_type == 'xgboost':
-            self.log("\n----- 使用XGBoost模型 -----")
-            self.models['red'] = self.train_xgboost(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_xgboost(X_train, y_blue_train, 'blue')
-        
-        elif self.model_type == 'gbdt':
-            self.log("\n----- 使用梯度提升决策树 -----")
-            self.models['red'] = self.train_gbdt(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_gbdt(X_train, y_blue_train, 'blue')
-        
-        elif self.model_type == 'lightgbm' and LIGHTGBM_AVAILABLE:
-            self.log("\n----- 使用LightGBM模型 -----")
-            self.models['red'] = self.train_lightgbm(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_lightgbm(X_train, y_blue_train, 'blue')
-        
-        elif self.model_type == 'catboost' and CATBOOST_AVAILABLE:
-            self.log("\n----- 使用CatBoost模型 -----")
-            self.models['red'] = self.train_catboost(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_catboost(X_train, y_blue_train, 'blue')
-        
-        elif self.model_type == 'ensemble':
-            self.log("\n----- 使用集成模型 -----")
-            self.models['red'] = self.train_ensemble(X_train, y_red_train, 'red')
-            self.models['blue'] = self.train_ensemble(X_train, y_blue_train, 'blue')
-        
-        model_train_time = time.time() - model_train_start
-        self.log(f"\n模型训练完成，耗时: {model_train_time:.2f}秒")
-        
-        self.log("\n====== 第3阶段: 模型评估 ======")
-        if X_test is not None and y_red_test is not None and y_blue_test is not None:
+        self.log("\n====== 第2阶段: 时间留出集评估 ======")
+        if X_test is not None and len(X_test) > 0:
             eval_start = time.time()
-            # TODO: 修复evaluate方法以支持多标签格式
-            # self.evaluate(X_test, y_red_test, y_blue_test)
-            self.log("多标签模型评估暂时跳过")
-            eval_time = time.time() - eval_start
-            self.log(f"模型评估完成，耗时: {eval_time:.2f}秒")
-        
+            eval_models = self._fit_models(X_train, y_red_train, y_blue_train)
+            self.eval_metrics = self.evaluate(
+                X_test, y_red_test, y_blue_test, models=eval_models)
+            del eval_models
+            self.log(f"评估完成，耗时: {time.time() - eval_start:.2f}秒")
+        else:
+            self.log("无可用测试集，跳过评估")
+
+        self.log("\n====== 第3阶段: 全量数据重训 ======")
+        if self._full_X_raw is not None:
+            refit_start = time.time()
+            full_scaler = StandardScaler()
+            X_full = full_scaler.fit_transform(self._full_X_raw)
+            self.scalers['X'] = full_scaler
+            self.scalers['red'] = full_scaler
+            self.scalers['blue'] = full_scaler
+            self.models = self._fit_models(X_full, self._full_y_red, self._full_y_blue)
+            self.log(f"全量重训完成（{len(X_full)} 条样本），耗时: {time.time() - refit_start:.2f}秒")
+        else:
+            self.models = self._fit_models(X_train, y_red_train, y_blue_train)
+
         self.log("\n====== 第4阶段: 模型保存 ======")
         save_start = time.time()
         self.save_models()
@@ -1381,201 +1479,85 @@ class LotteryMLModels:
         
         self.log("期望值模型训练完成")
     
-    def evaluate(self, X_test, y_red_test, y_blue_test):
+    def evaluate(self, X_test, y_red_test, y_blue_test, models=None):
         """
-        评估模型（支持多标签格式）
-        
+        在时间顺序留出集上评估模型（支持全部多标签模型与集成模型）。
+
         Args:
-            X_test: 测试特征
-            y_red_test: 红球多标签 (n_samples, red_range)
-            y_blue_test: 蓝球多标签 (n_samples, blue_range)
+            X_test: 测试特征（已用训练集缩放器变换）
+            y_red_test: 红球多标签矩阵 (n_samples, red_range)
+            y_blue_test: 蓝球多标签矩阵 (n_samples, blue_range)
+            models: 待评估模型；默认使用 self.models（训练中传入留出集模型）
         """
-        self.log("评估模型性能...")
-        
-        # 转换多标签为号码列表
-        def multilabel_to_numbers(y_multilabel):
-            """将多标签矩阵转为号码列表"""
-            numbers_list = []
-            for row in y_multilabel:
-                numbers = [i + 1 for i, val in enumerate(row) if val == 1]  # 1-based
-                numbers_list.append(numbers)
-            return numbers_list
-        
-        y_red_true = multilabel_to_numbers(y_red_test)
-        y_blue_true = multilabel_to_numbers(y_blue_test)
-        
-        # 获取预测
-        try:
-            if isinstance(self.models['red'], (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel)):
-                # 新模型直接返回号码列表
-                y_red_pred = self.models['red'].predict(X_test)
-                y_blue_pred = self.models['blue'].predict(X_test)
-            else:
-                # 旧模型暂不评估
-                self.log("旧模型格式，跳过评估")
-                return
-            
-            # 计算准确率（逐样本检查交集个数）
-            red_hits = []
-            for true, pred in zip(y_red_true, y_red_pred):
-                hits = len(set(true) & set(pred))
-                red_hits.append(hits)
-            
-            blue_hits = []
-            for true, pred in zip(y_blue_true, y_blue_pred):
-                hits = len(set(true) & set(pred))
-                blue_hits.append(hits)
-            
-            avg_red_hits = np.mean(red_hits)
-            avg_blue_hits = np.mean(blue_hits)
-            
-            self.log(f"红球平均命中数: {avg_red_hits:.2f}/{self.red_count}")
-            self.log(f"蓝球平均命中数: {avg_blue_hits:.2f}/{self.blue_count}")
-            
-            # 统计命中分布
-            from collections import Counter
-            red_counter = Counter(red_hits)
-            blue_counter = Counter(blue_hits)
-            
-            self.log(f"红球命中分布: {dict(red_counter)}")
-            self.log(f"蓝球命中分布: {dict(blue_counter)}")
-            
-        except Exception as e:
-            self.log(f"评估过程出错: {e}")
-            import traceback
-            self.log(traceback.format_exc())
-        """评估模型性能"""
-        self.log("评估模型性能...")
-        
-        if len(y_red_test.shape) == 1:
-            y_red_test = y_red_test.reshape(-1, 1)
-        if len(y_blue_test.shape) == 1:
-            y_blue_test = y_blue_test.reshape(-1, 1)
-            
-        red_accuracy = 0
-        blue_accuracy = 0
-        
-        if 'red' in self.models:
-            # 处理不同类型的模型
-            if self.model_type == 'ensemble':
-                # 集成模型需要单独处理，对每个子模型进行预测，然后进行投票
-                red_votes = {}
-                for model_name, model in self.models['red'].items():
-                    self.log(f"评估{model_name}模型...")
-                    try:
-                        y_pred = model.predict(X_test)
-                        
-                        # 预测结果处理，确保能够进行投票
-                        if len(y_pred.shape) > 1 and y_pred.shape[1] > 1:
-                            y_pred = np.argmax(y_pred, axis=1)
-                        
-                        # 记录每个样本的投票
-                        for i, pred in enumerate(y_pred):
-                            # catboost 等可能返回 (n,1) 形状，pred 为单元素数组，需转标量才能作 dict key
-                            if isinstance(pred, np.ndarray):
-                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
-                            else:
-                                pred = int(pred)
-                            if i not in red_votes:
-                                red_votes[i] = {}
-                            if pred not in red_votes[i]:
-                                red_votes[i][pred] = 0
-                            red_votes[i][pred] += 1
-                    except Exception as e:
-                        self.log(f"评估{model_name}模型时出错: {e}")
-                
-                # 根据投票确定最终预测结果
-                y_pred_red = []
-                for i in range(len(X_test)):
-                    if i in red_votes and red_votes[i]:
-                        # 找出得票最多的类别
-                        pred_class = max(red_votes[i].items(), key=lambda x: x[1])[0]
-                        y_pred_red.append(pred_class)
-                    else:
-                        # 如果没有投票，默认预测0
-                        y_pred_red.append(0)
-                
-                y_pred_red = np.array(y_pred_red)
-            else:
-                # 单一模型
-                y_pred_red = self.models['red'].predict(X_test)
-            
-            if len(y_pred_red.shape) > 1 and y_pred_red.shape[1] > 1:
-                self.log(f"处理多维预测结果，形状: {y_pred_red.shape}")
-                y_pred_red = np.argmax(y_pred_red, axis=1)
-            
-            y_red_test_flat = y_red_test.flatten()
-            y_pred_red_flat = y_pred_red.flatten()
-            
-            self.log(f"红球预测形状: {y_pred_red_flat.shape}, 真实值形状: {y_red_test_flat.shape}")
-            
-            red_accuracy = np.mean(y_pred_red_flat == y_red_test_flat)
-            self.log(f"红球预测准确率: {red_accuracy:.4f}")
-        
-        if 'blue' in self.models:
-            # 处理不同类型的模型
-            if self.model_type == 'ensemble':
-                # 集成模型需要单独处理，对每个子模型进行预测，然后进行投票
-                blue_votes = {}
-                for model_name, model in self.models['blue'].items():
-                    self.log(f"评估{model_name}模型...")
-                    try:
-                        y_pred = model.predict(X_test)
-                        
-                        # 预测结果处理，确保能够进行投票
-                        if len(y_pred.shape) > 1 and y_pred.shape[1] > 1:
-                            y_pred = np.argmax(y_pred, axis=1)
-                        
-                        # 记录每个样本的投票
-                        for i, pred in enumerate(y_pred):
-                            # catboost 等可能返回 (n,1) 形状，pred 为单元素数组，需转标量才能作 dict key
-                            if isinstance(pred, np.ndarray):
-                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
-                            else:
-                                pred = int(pred)
-                            if i not in blue_votes:
-                                blue_votes[i] = {}
-                            if pred not in blue_votes[i]:
-                                blue_votes[i][pred] = 0
-                            blue_votes[i][pred] += 1
-                    except Exception as e:
-                        self.log(f"评估{model_name}模型时出错: {e}")
-                
-                # 根据投票确定最终预测结果
-                y_pred_blue = []
-                for i in range(len(X_test)):
-                    if i in blue_votes and blue_votes[i]:
-                        # 找出得票最多的类别
-                        pred_class = max(blue_votes[i].items(), key=lambda x: x[1])[0]
-                        y_pred_blue.append(pred_class)
-                    else:
-                        # 如果没有投票，默认预测0
-                        y_pred_blue.append(0)
-                
-                y_pred_blue = np.array(y_pred_blue)
-            else:
-                # 单一模型
-                y_pred_blue = self.models['blue'].predict(X_test)
-            
-            if len(y_pred_blue.shape) > 1 and y_pred_blue.shape[1] > 1:
-                self.log(f"处理多维预测结果，形状: {y_pred_blue.shape}")
-                y_pred_blue = np.argmax(y_pred_blue, axis=1)
-            
-            y_blue_test_flat = y_blue_test.flatten()
-            y_pred_blue_flat = y_pred_blue.flatten()
-            
-            # 记录预测和实际值的形状以便调试
-            self.log(f"蓝球预测形状: {y_pred_blue_flat.shape}, 真实值形状: {y_blue_test_flat.shape}")
-            
-            # 计算准确率
-            blue_accuracy = np.mean(y_pred_blue_flat == y_blue_test_flat)
-            self.log(f"蓝球预测准确率: {blue_accuracy:.4f}")
-        
-        # 计算整体准确率
-        overall_accuracy = (red_accuracy + blue_accuracy) / 2
-        self.log(f"整体预测准确率: {overall_accuracy:.4f}")
-        
-        return red_accuracy, blue_accuracy
+        eval_models = self.models if models is None else models
+        n_samples = len(X_test)
+        if n_samples == 0:
+            self.log("测试集为空，跳过评估")
+            return {}
+
+        self.log(f"评估模型性能（时间留出集 {n_samples} 期）...")
+
+        if self.model_type == 'ensemble':
+            red_matrix = _ensemble_proba_matrix(
+                eval_models['red'], X_test,
+                weights=getattr(self, 'sub_weights', None), n_classes=self.red_range)
+            blue_matrix = _ensemble_proba_matrix(
+                eval_models['blue'], X_test,
+                weights=getattr(self, 'sub_weights', None), n_classes=self.blue_range)
+        else:
+            red_matrix = _proba_matrix(eval_models['red'], X_test, n_classes=self.red_range)
+            blue_matrix = _proba_matrix(eval_models['blue'], X_test, n_classes=self.blue_range)
+
+        if red_matrix is None or blue_matrix is None:
+            self.log("模型不支持概率输出，无法评估")
+            return {}
+
+        red_matrix = self._pad_proba_matrix(red_matrix, self.red_range)
+        blue_matrix = self._pad_proba_matrix(blue_matrix, self.blue_range)
+
+        from collections import Counter
+
+        def evaluate_ball(matrix, y_true, count, name):
+            hits = []
+            exact = 0
+            for i in range(n_samples):
+                pred = set(np.argsort(-matrix[i], kind='stable')[:count].tolist())
+                true = set(np.flatnonzero(y_true[i]).tolist())
+                hit = len(pred & true)
+                hits.append(hit)
+                exact += int(pred == true)
+            distribution = {str(k): int(v) for k, v in sorted(Counter(hits).items())}
+            avg_hits = float(np.mean(hits)) if hits else 0.0
+            exact_rate = exact / n_samples
+            self.log(
+                f"{name}平均命中: {avg_hits:.2f}/{count}，"
+                f"完全命中率: {exact_rate:.2%}，命中分布: {distribution}")
+            return {
+                'avg_hits': avg_hits,
+                'exact_rate': float(exact_rate),
+                'hit_distribution': distribution,
+                'count': int(count),
+            }
+
+        metrics = {
+            'samples': int(n_samples),
+            'red': evaluate_ball(red_matrix, y_red_test, self.red_count, '红球'),
+            'blue': evaluate_ball(blue_matrix, y_blue_test, self.blue_count, '蓝球'),
+        }
+        self.eval_metrics = metrics
+        return metrics
+
+    @staticmethod
+    def _pad_proba_matrix(matrix, n_classes):
+        """把概率矩阵列数补齐/截断到号码范围。"""
+        matrix = np.asarray(matrix, dtype=float)
+        if matrix.ndim == 1:
+            matrix = matrix.reshape(1, -1)
+        if matrix.shape[1] < n_classes:
+            matrix = np.pad(matrix, ((0, 0), (0, n_classes - matrix.shape[1])))
+        elif matrix.shape[1] > n_classes:
+            matrix = matrix[:, :n_classes]
+        return matrix
     
     def save_models(self):
         """保存模型和缩放器"""
@@ -1676,6 +1658,10 @@ class LotteryMLModels:
         # 添加特征数量信息
         model_info['feature_mode'] = getattr(self, 'feature_mode', 'original')
         model_info['aug_feature_names'] = list(getattr(self, 'aug_feature_names', []))
+        if getattr(self, 'eval_metrics', None):
+            model_info['eval_metrics'] = self.eval_metrics
+        if getattr(self, 'data_split', None):
+            model_info['data_split'] = self.data_split
         expected_feature_count = getattr(self, 'expected_feature_count', None)
         if expected_feature_count:
             model_info['expected_feature_count'] = expected_feature_count
@@ -1783,6 +1769,8 @@ class LotteryMLModels:
             # 恢复特征模式（旧模型无此字段=original，行为与升级前完全一致）
             self.feature_mode = model_info.get('feature_mode', 'original')
             self.aug_feature_names = list(model_info.get('aug_feature_names', []))
+            self.eval_metrics = model_info.get('eval_metrics')
+            self.data_split = model_info.get('data_split')
             if self.feature_mode == 'enhanced':
                 self.log(f"模型为增强特征模式({len(self.aug_feature_names)}个衍生列)")
 
@@ -1994,7 +1982,144 @@ class LotteryMLModels:
                              ", ".join(f"{n}={self.sub_weights[n]:.2f}" for n in named))
         except Exception:
             self.sub_weights = {}
-        
+
+    def _expected_feature_count(self):
+        """训练时期望的展平特征维度；优先使用模型元数据，最后回退到70。"""
+        expected = getattr(self, 'expected_feature_count', None)
+        if expected:
+            return int(expected)
+        model_obj = self.models.get('red')
+        if self.model_type == 'ensemble' and isinstance(model_obj, dict):
+            model_obj = model_obj.get('random_forest') or next(iter(model_obj.values()), None)
+        if model_obj is not None:
+            n_feat = getattr(model_obj, 'n_features_in_', None)
+            if n_feat:
+                return int(n_feat)
+            importances = getattr(model_obj, 'feature_importances_', None)
+            if importances is not None and getattr(importances, 'shape', None):
+                return int(importances.shape[0])
+        return 70
+
+    def _build_prediction_features(self, recent_data):
+        """构建与训练一致的滑动窗口特征，并按训练缩放器标准化。失败返回 None。"""
+        if self.lottery_type == 'dlt':
+            red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:5]
+            blue_cols = [col for col in recent_data.columns if col.startswith('蓝球_')][:2]
+        else:
+            red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:6]
+            blue_cols = []
+            for col in recent_data.columns:
+                if col.startswith('蓝球_') or col == '蓝球':
+                    blue_cols.append(col)
+                    if len(blue_cols) >= 1:
+                        break
+
+        recent_data = recent_data.sort_values('期数', ascending=False).reset_index(drop=True)
+        if len(recent_data) < self.feature_window:
+            self.log(f"历史数据不足，需要至少 {self.feature_window} 期")
+            return None
+
+        aug_mat = None
+        if getattr(self, 'feature_mode', 'original') == 'enhanced':
+            aug_mat = self._aug_row_features(recent_data)
+            if aug_mat is None:
+                self.log("错误: 增强模型无法计算衍生特征(历史不足或期号对不齐)，本次预测中止")
+                return None
+
+        features = []
+        for j in range(self.feature_window):
+            row_features = [recent_data.iloc[j][col] for col in red_cols + blue_cols]
+            if aug_mat is not None:
+                row_features.extend([float(x) for x in aug_mat[j]])
+            features.append(row_features)
+
+        X_reshaped = np.array([features]).reshape(1, -1)
+        expected = self._expected_feature_count()
+        actual = X_reshaped.shape[1]
+        if actual != expected:
+            self.log(f"警告: 特征数量不匹配，预期{expected}个，实际{actual}个")
+            if actual < expected:
+                X_reshaped = np.pad(X_reshaped, ((0, 0), (0, expected - actual)))
+            else:
+                X_reshaped = X_reshaped[:, :expected]
+
+        try:
+            scaler = self.scalers.get('X')
+            if scaler is None:
+                scaler = self.scalers.get('red')
+            if scaler is None:
+                return X_reshaped
+            return scaler.transform(X_reshaped)
+        except Exception as e:
+            self.log(f"应用特征缩放时出错，使用未缩放特征: {e}")
+            return X_reshaped
+
+    def _get_probability_maps(self, recent_data):
+        """返回红/蓝球逐号码概率 {0-based索引: 概率}，并写入 last_*_proba。"""
+        X_scaled = self._build_prediction_features(recent_data)
+        if X_scaled is None:
+            return None
+
+        if self.model_type == 'ensemble':
+            red_matrix = _ensemble_proba_matrix(
+                self.models['red'], X_scaled,
+                weights=getattr(self, 'sub_weights', None), n_classes=self.red_range)
+            blue_matrix = _ensemble_proba_matrix(
+                self.models['blue'], X_scaled,
+                weights=getattr(self, 'sub_weights', None), n_classes=self.blue_range)
+        else:
+            red_matrix = _proba_matrix(self.models['red'], X_scaled, n_classes=self.red_range)
+            blue_matrix = _proba_matrix(self.models['blue'], X_scaled, n_classes=self.blue_range)
+
+        if red_matrix is None or blue_matrix is None:
+            self.log("模型无概率输出，无法按概率选号")
+            return None
+
+        red_matrix = self._pad_proba_matrix(red_matrix, self.red_range)
+        blue_matrix = self._pad_proba_matrix(blue_matrix, self.blue_range)
+        red_proba = {i: float(red_matrix[0, i]) for i in range(self.red_range)}
+        blue_proba = {i: float(blue_matrix[0, i]) for i in range(self.blue_range)}
+        self.last_red_proba = red_proba
+        self.last_blue_proba = blue_proba
+        return red_proba, blue_proba
+
+    @staticmethod
+    def _select_numbers(proba, count, ball_range, variation=0, seed_period=0):
+        """按概率排序选号。
+
+        variation=0 取概率最高的 count 个；variation>0 时在概率靠前的候选池中
+        按种子(由 variation 和期号决定)无放回抽样，保证同一次预测可复现。
+        """
+        ranked = sorted(
+            ((int(k), float(v)) for k, v in (proba or {}).items()
+             if 0 <= int(k) < ball_range),
+            key=lambda kv: (-kv[1], kv[0]))
+        ranked_numbers = [k + 1 for k, _ in ranked]
+        if len(ranked_numbers) < ball_range:
+            ranked_numbers.extend(
+                n for n in range(1, ball_range + 1) if n not in ranked_numbers)
+
+        if variation <= 0 or count >= len(ranked_numbers):
+            return sorted(ranked_numbers[:count])
+
+        pool = ranked[:min(len(ranked), count + max(3, count))]
+        pool_numbers = np.array([k + 1 for k, _ in pool], dtype=int)
+        weights = np.array([max(0.0, p) for _, p in pool], dtype=float)
+        if weights.sum() <= 0:
+            weights = None
+        else:
+            weights = weights / weights.sum()
+
+        rng = np.random.default_rng((int(variation) + 1) * 1000003 + int(seed_period))
+        chosen = rng.choice(
+            pool_numbers, size=min(count, len(pool_numbers)),
+            replace=False, p=weights)
+        selected = [int(n) for n in chosen]
+        if len(selected) < count:
+            remaining = [n for n in ranked_numbers if n not in selected]
+            selected.extend(remaining[:count - len(selected)])
+        return sorted(selected)
+
     def predict(self, recent_data, variation=0):
         """
         生成预测结果
@@ -2087,305 +2212,24 @@ class LotteryMLModels:
             self.log("模型未加载，无法预测")
             return None, None
         
-        # 对于其他模型的处理保持不变
-        # 提取红蓝球列名
-        if self.lottery_type == 'dlt':
-            red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:5]
-            blue_cols = [col for col in recent_data.columns if col.startswith('蓝球_')][:2]
-        else:  # ssq
-            red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:6]
-            # 注意：SSQ的CSV蓝球列名为"蓝球"(无下划线)，必须与训练时prepare_data的
-            # 兼容逻辑保持一致，否则blue_cols为空导致特征数与模型不匹配(70 vs 60)
-            blue_cols = []
-            for col in recent_data.columns:
-                if col.startswith('蓝球_') or col == '蓝球':
-                    blue_cols.append(col)
-                    if len(blue_cols) >= 1:  # 双色球只有1个蓝球
-                        break
-            
-        # 确保数据按期数降序排列
-        recent_data = recent_data.sort_values('期数', ascending=False).reset_index(drop=True)
-        
-        # 确保有足够的历史数据
-        if len(recent_data) < self.feature_window:
-            self.log(f"历史数据不足，需要至少 {self.feature_window} 期")
+        # 统一走概率排序选号：模型输出的是 0-based 类别概率，
+        # 这里只做一次 +1 转号码，避免不同包装器重复偏移。
+        maps = self._get_probability_maps(recent_data)
+        if maps is None:
             return None, None
-        
-        # 创建特征序列
-        X_data = []
+        red_proba, blue_proba = maps
 
-        # 增强特征模式：拼接衍生特征（与训练侧列序一致）
-        aug_mat = None
-        if getattr(self, 'feature_mode', 'original') == 'enhanced':
-            aug_mat = self._aug_row_features(recent_data)
-            if aug_mat is None:
-                # 增强模型缺衍生列时填零预测=伪概率，必须硬失败
-                self.log("错误: 增强模型无法计算衍生特征(历史不足或期号对不齐)，本次预测中止")
-                return None, None
-        
-        # 使用滑动窗口创建序列数据
-        features = []
-        for j in range(self.feature_window):
-            row_features = []
-            for col in red_cols + blue_cols:
-                row_features.append(recent_data.iloc[j][col])
-            if aug_mat is not None:
-                row_features.extend([float(x) for x in aug_mat[j]])
-            features.append(row_features)
-            
-        X_data.append(features)
-        
-        # 转换为NumPy数组
-        X = np.array(X_data)
-        
-        # 重塑特征以适合模型
-        X_reshaped = X.reshape(X.shape[0], -1)
-        
-        # 获取模型详细信息以进行调试
-        red_model_info = ""
-        if 'red' in self.models:
-            if self.model_type == 'ensemble':
-                if 'random_forest' in self.models['red']:
-                    red_model_info = f"特征数量: {getattr(self.models['red']['random_forest'], 'n_features_in_', '未知')}, 类型: {type(self.models['red']['random_forest']).__name__}"
-            else:
-                # 特征数量显示：优先模型自身 n_features_in_，无效(缺失/0/None)时回退到
-                # model_info.json 中记录的 expected_feature_count，避免显示"未知"或0
-                try:
-                    n_feat = self.models['red'].n_features_in_
-                    if n_feat is None or n_feat == 0:
-                        raise AttributeError  # 无效值，走回退
-                except AttributeError:
-                    n_feat = getattr(self, 'expected_feature_count', '未知')
-                red_model_info = f"特征数量: {n_feat}, 类型: {type(self.models['red']).__name__}"
-        self.log(f"红球模型信息: {red_model_info}")
-        
-        # 检查特征数量是否与训练时的特征数量匹配
-        # 从模型信息或模型本身获取预期的特征数量
-        expected_features = getattr(self, 'expected_feature_count', 70)  # 默认70，与训练时保持一致
-        
-        # 也可以尝试从模型中获取
-        if 'red' in self.models:
-            model_obj = self.models['red']
-            # 处理不同类型的模型
-            if self.model_type == 'ensemble' and 'random_forest' in model_obj:
-                model_obj = model_obj['random_forest']
-                
-            # catboost 等模型反序列化后 n_features_in_ 可能是 0，视为无效回退到 expected_feature_count
-            if hasattr(model_obj, 'n_features_in_') and model_obj.n_features_in_:
-                expected_features = model_obj.n_features_in_
-                self.log(f"从模型中获取的特征数量: {expected_features}")
-            elif hasattr(model_obj, 'feature_importances_') and hasattr(model_obj.feature_importances_, 'shape'):
-                expected_features = model_obj.feature_importances_.shape[0]
-                self.log(f"从模型特征重要性中获取的特征数量: {expected_features}")
-            # 尝试获取更多的模型属性
-            elif hasattr(model_obj, 'estimators_') and model_obj.estimators_:
-                first_estimator = model_obj.estimators_[0]
-                if hasattr(first_estimator, 'n_features_in_'):
-                    expected_features = first_estimator.n_features_in_
-                    self.log(f"从模型第一个估计器中获取的特征数量: {expected_features}")
-        
-        actual_features = X_reshaped.shape[1]
-        
-        if actual_features != expected_features:
-            self.log(f"警告: 特征数量不匹配，预期{expected_features}个，实际{actual_features}个")
-            # 根据情况补充或截断特征
-            if actual_features < expected_features:
-                # 如果特征不足，填充零
-                padding = np.zeros((X_reshaped.shape[0], expected_features - actual_features))
-                X_reshaped = np.concatenate([X_reshaped, padding], axis=1)
-                self.log(f"已将特征填充至{X_reshaped.shape[1]}个")
-            else:
-                # 如果特征过多，截断
-                X_reshaped = X_reshaped[:, :expected_features]
-                self.log(f"已将特征截断至{X_reshaped.shape[1]}个")
-        
-        # 应用特征缩放
-        try:
-            if 'X' in self.scalers:
-                X_scaled = self.scalers['X'].transform(X_reshaped)
-                self.log("使用通用特征缩放器进行预测")
-            else:
-                # 回退到红球缩放器
-                X_scaled = self.scalers['red'].transform(X_reshaped)
-                self.log("使用红球特征缩放器进行预测")
-        except Exception as e:
-            self.log(f"应用特征缩放时出错: {e}")
-            self.log("使用未缩放的特征进行预测")
-            X_scaled = X_reshaped
-        
-        try:
-            if self.model_type == 'ensemble':
-                # 集成模型：self.models['red'] 是各子模型的 dict（没有predict方法），
-                # 必须逐模型预测后投票，不能直接调用 self.models['red'].predict()
-                red_votes = {}
-                # 动态权重：前向核验表现好的子模型票权更高（无权重文件时等权）
-                _sw = getattr(self, 'sub_weights', None) or {}
-                for name, model in self.models['red'].items():
-                    _w = float(_sw.get(name, 1.0) or 1.0)
-                    preds = model.predict(X_scaled)[0]
-                    if hasattr(preds, "__iter__"):
-                        for pred in preds:
-                            # 统一转标量：catboost 等可能输出单元素数组
-                            if isinstance(pred, np.ndarray):
-                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
-                            else:
-                                pred = int(pred)
-                            if pred not in red_votes:
-                                red_votes[pred] = 0
-                            red_votes[pred] += _w
-                    else:
-                        # 单一预测值
-                        if preds not in red_votes:
-                            red_votes[preds] = 0
-                        red_votes[preds] += _w
-                red_predictions = sorted(red_votes.items(), key=lambda x: x[1], reverse=True)[:self.red_count]
-                red_predictions = [int(p[0]) + 1 for p in red_predictions]  # +1 转回原始号码范围
-            else:
-                # 单一模型预测
-                red_pred = self.models['red'].predict(X_scaled)[0]
-                
-                # 检测是否是新的多标签模型（已经返回1-based号码）
-                if isinstance(self.models['red'], (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel)):
-                    # 新模型已经返回1-based号码列表
-                    red_predictions = red_pred if isinstance(red_pred, list) else [red_pred]
-                else:
-                    # 旧模型返回0-based索引，需要+1
-                    if hasattr(red_pred, "__iter__"):
-                        red_predictions = [int(p) + 1 for p in red_pred]
-                    else:
-                        red_predictions = [int(red_pred) + 1]
-            
-            # 计算红球置信度（所选红球号码的模型概率均值）
-            try:
-                if self.model_type == 'ensemble':
-                    proba_map = _ensemble_proba_dict(self.models['red'], X_scaled,
-                                                     weights=getattr(self, 'sub_weights', None))
-                else:
-                    proba_map = _class_proba_dict(self.models['red'], X_scaled)
-                self.last_red_conf = _mean_confidence(proba_map, red_predictions)
-                self.last_red_proba = proba_map  # 存储完整概率映射用于校准
-            except Exception:
-                self.last_red_conf = None
-                self.last_red_proba = None
-            
-            # 预测蓝球
-            if self.model_type == 'ensemble':
-                # 集成模型：self.models['blue'] 是各子模型的 dict，逐模型预测后投票
-                blue_votes = {}
-                _sw_b = getattr(self, 'sub_weights', None) or {}
-                for name, model in self.models['blue'].items():
-                    _wb = float(_sw_b.get(name, 1.0) or 1.0)
-                    preds = model.predict(X_scaled)[0]
-                    if hasattr(preds, "__iter__"):
-                        for pred in preds:
-                            # 统一转标量：catboost 等可能输出单元素数组
-                            if isinstance(pred, np.ndarray):
-                                pred = pred.item() if pred.size == 1 else int(np.argmax(pred))
-                            else:
-                                pred = int(pred)
-                            if pred not in blue_votes:
-                                blue_votes[pred] = 0
-                            blue_votes[pred] += _wb
-                    else:
-                        # 单一预测值
-                        if preds not in blue_votes:
-                            blue_votes[preds] = 0
-                        blue_votes[preds] += _wb
-                
-                # 从得票前3的蓝球中随机选择，而不是总是选择得票最高的
-                top_blue_votes = sorted(blue_votes.items(), key=lambda x: x[1], reverse=True)
-                top_count = min(3, len(top_blue_votes))
-                
-                # 有60%概率使用票数最高的蓝球，40%概率从票数前3的蓝球中随机选择
-                if np.random.random() < 0.6 or top_count == 1:
-                    blue_predictions = [int(p[0]) + 1 for p in top_blue_votes[:self.blue_count]]  # +1 转回原始号码范围
-                else:
-                    # 随机选择前top_count个中的blue_count个
-                    selected_indices = np.random.choice(top_count, size=min(self.blue_count, top_count), replace=False)
-                    blue_predictions = [int(top_blue_votes[i][0]) + 1 for i in selected_indices]  # +1 转回原始号码范围
-            else:
-                # 单一模型预测
-                blue_pred = self.models['blue'].predict(X_scaled)[0]
-                
-                # 检测是否是新的多标签模型
-                if isinstance(self.models['blue'], (WrappedMultilabelLightGBMModel, WrappedMultilabelRandomForestModel)):
-                    # 新模型已经返回1-based号码列表
-                    blue_predictions = blue_pred if isinstance(blue_pred, list) else [blue_pred]
-                else:
-                    # 旧模型返回0-based索引
-                    if hasattr(blue_pred, "__iter__"):
-                        # 随机设定阈值，增加随机性
-                        if np.random.random() < 0.3 and len(blue_pred) > 1:
-                            # 30%的概率，从前3个最高概率蓝球中随机选择
-                            top_indices = np.argsort(blue_pred)[-3:] if len(blue_pred) >= 3 else np.argsort(blue_pred)
-                            selected_idx = np.random.choice(top_indices)
-                            blue_predictions = [int(selected_idx) + 1]  # +1 转回原始号码范围
-                        else:
-                            # 70%的概率，使用原始预测
-                            blue_predictions = [int(p) + 1 for p in blue_pred]  # +1 转回原始号码范围
-                    else:
-                        # 直接使用并添加随机性
-                        if np.random.random() < 0.25:  # 25%概率使用随机蓝球而不是模型预测
-                            # 根据彩票类型确定蓝球范围
-                            blue_range = self.blue_range
-                            blue_predictions = [np.random.randint(1, blue_range + 1)]
-                        else:
-                            blue_predictions = [int(blue_pred) + 1]  # +1 转回原始号码范围
-            
-            # 计算蓝球置信度（所选蓝球号码的模型概率均值）
-            try:
-                if self.model_type == 'ensemble':
-                    proba_map = _ensemble_proba_dict(self.models['blue'], X_scaled,
-                                                     weights=getattr(self, 'sub_weights', None))
-                else:
-                    proba_map = _class_proba_dict(self.models['blue'], X_scaled)
-                self.last_blue_conf = _mean_confidence(proba_map, blue_predictions)
-                self.last_blue_proba = proba_map  # 存储完整概率映射用于校准
-            except Exception:
-                self.last_blue_conf = None
-                self.last_blue_proba = None
-        except Exception as e:
-            self.log(f"预测过程中出错: {e}")
-            import traceback
-            self.log(traceback.format_exc())
-            # 出错时返回随机号码
-            red_predictions = []
-            blue_predictions = []
-            
-        # 生成完整号码集
-        while len(red_predictions) < self.red_count:
-            # 如果预测的红球数量不足，随机补充
-            new_num = np.random.randint(1, self.red_range + 1)
-            if new_num not in red_predictions:
-                red_predictions.append(new_num)
-                
-        while len(blue_predictions) < self.blue_count:
-            # 如果预测的蓝球数量不足，随机补充
-            new_num = np.random.randint(1, self.blue_range + 1)
-            if new_num not in blue_predictions:
-                blue_predictions.append(new_num)
-                
-        # 确保号码不重复且按升序排列
-        red_predictions = sorted(list(set(red_predictions)))[:self.red_count]
-        blue_predictions = sorted(list(set(blue_predictions)))[:self.blue_count]
-        
-        # 增加随机性：有5%的概率完全随机生成一个蓝球号码
-        if np.random.random() < 0.05:
-            self.log("随机生成蓝球号码以增加多样性")
-            blue_predictions = []
-            for _ in range(self.blue_count):
-                blue_predictions.append(np.random.randint(1, self.blue_range + 1))
-            blue_predictions = sorted(list(set(blue_predictions)))
-            
-            # 如果随机生成后数量不足，继续随机补充
-            while len(blue_predictions) < self.blue_count:
-                new_num = np.random.randint(1, self.blue_range + 1)
-                if new_num not in blue_predictions:
-                    blue_predictions.append(new_num)
-            blue_predictions = sorted(blue_predictions)[:self.blue_count]
-            # 随机号码没有模型依据，置信度记为 0
-            self.last_blue_conf = 0.0
-        
+        latest_period = int(recent_data['期数'].max()) if len(recent_data) else 0
+        red_predictions = self._select_numbers(
+            red_proba, self.red_count, self.red_range,
+            variation=variation, seed_period=latest_period)
+        blue_predictions = self._select_numbers(
+            blue_proba, self.blue_count, self.blue_range,
+            variation=variation, seed_period=latest_period)
+
+        self.last_red_conf = _mean_confidence(red_proba, red_predictions)
+        self.last_blue_conf = _mean_confidence(blue_proba, blue_predictions)
+
         # 组装整体置信度：按号码个数加权红/蓝
         if self.last_red_conf is not None or self.last_blue_conf is not None:
             red_c = self.last_red_conf if self.last_red_conf is not None else 0.0
@@ -2467,108 +2311,26 @@ class LotteryMLModels:
             self.log("期望值模型不支持该预测方式，请使用 ensemble/gbdt/lightgbm/catboost")
             return None, None
 
-        try:
-            # ---- 特征构建（与 predict 保持一致）----
-            if self.lottery_type == 'dlt':
-                red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:5]
-                blue_cols = [col for col in recent_data.columns if col.startswith('蓝球_')][:2]
-            else:  # ssq
-                red_cols = [col for col in recent_data.columns if col.startswith('红球_')][:6]
-                # SSQ 蓝球列名为"蓝球"(无下划线)，必须与 predict/训练兼容
-                blue_cols = []
-                for col in recent_data.columns:
-                    if col.startswith('蓝球_') or col == '蓝球':
-                        blue_cols.append(col)
-                        if len(blue_cols) >= 1:
-                            break
-
-            recent_data = recent_data.sort_values('期数', ascending=False).reset_index(drop=True)
-            if len(recent_data) < self.feature_window:
-                self.log(f"历史数据不足，需要至少 {self.feature_window} 期")
-                return None, None
-
-            # 增强特征模式：拼接衍生特征（与 predict 一致，失败硬中止防伪概率）
-            aug_mat = None
-            if getattr(self, 'feature_mode', 'original') == 'enhanced':
-                aug_mat = self._aug_row_features(recent_data)
-                if aug_mat is None:
-                    self.log("错误: 增强模型无法计算衍生特征，本次预测中止")
-                    return None, None
-
-            # 滑动窗口创建序列特征
-            features = []
-            for j in range(self.feature_window):
-                row_features = []
-                for col in red_cols + blue_cols:
-                    row_features.append(recent_data.iloc[j][col])
-                if aug_mat is not None:
-                    row_features.extend([float(x) for x in aug_mat[j]])
-                features.append(row_features)
-            X = np.array([features])
-            X_reshaped = X.reshape(X.shape[0], -1)
-
-            # 特征缩放（与 predict 相同的回退逻辑）
-            try:
-                if 'X' in self.scalers:
-                    X_scaled = self.scalers['X'].transform(X_reshaped)
-                else:
-                    X_scaled = self.scalers['red'].transform(X_reshaped)
-            except Exception:
-                X_scaled = X_reshaped
-
-            # ---- 获取全号码概率排序 ----
-            # 检测是否是新的多标签模型
-            if isinstance(self.models['red'], (
-                WrappedMultilabelLightGBMModel,
-                WrappedMultilabelRandomForestModel,
-                WrappedMultilabelXGBoostModel,
-                WrappedMultilabelGBDTModel,
-                WrappedMultilabelCatBoostModel
-            )):
-                # 新模型：直接使用predict_proba
-                red_proba_array = self.models['red'].predict_proba(X_scaled)[0]  # (n_classes,)
-                blue_proba_array = self.models['blue'].predict_proba(X_scaled)[0]
-                
-                # 转为dict格式 {号码(1-based): 概率}
-                red_proba = {i+1: p for i, p in enumerate(red_proba_array)}
-                blue_proba = {i+1: p for i, p in enumerate(blue_proba_array)}
-                
-            elif self.model_type == 'ensemble':
-                red_proba = _ensemble_proba_dict(self.models['red'], X_scaled,
-                                                 weights=getattr(self, 'sub_weights', None))
-                blue_proba = _ensemble_proba_dict(self.models['blue'], X_scaled,
-                                                  weights=getattr(self, 'sub_weights', None))
-            else:
-                red_proba = _class_proba_dict(self.models['red'], X_scaled)
-                blue_proba = _class_proba_dict(self.models['blue'], X_scaled)
-
-            if not red_proba or not blue_proba:
-                self.log("模型无概率输出。xgboost(softmax)等模型不支持，请改用 ensemble/gbdt/lightgbm/catboost")
-                return None, None
-
-            # 存储概率映射用于后续校准
-            self.last_red_proba = red_proba
-            self.last_blue_proba = blue_proba
-
-            red_ranked = sorted(red_proba.items(), key=lambda x: x[1], reverse=True)
-            blue_ranked = sorted(blue_proba.items(), key=lambda x: x[1], reverse=True)
-            red_ranked = [int(p) for p, _ in red_ranked]  # 已经是1-based
-            blue_ranked = [int(p) for p, _ in blue_ranked]
-            return red_ranked, blue_ranked
-        except Exception as e:
-            self.log(f"号码概率排序出错: {e}")
-            import traceback
-            self.log(traceback.format_exc())
+        maps = self._get_probability_maps(recent_data)
+        if maps is None:
             return None, None
+        red_proba, blue_proba = maps
+
+        red_ranked = [k + 1 for k, _ in sorted(
+            red_proba.items(), key=lambda kv: (-kv[1], kv[0]))]
+        blue_ranked = [k + 1 for k, _ in sorted(
+            blue_proba.items(), key=lambda kv: (-kv[1], kv[0]))]
+        return red_ranked, blue_ranked
 
     @staticmethod
     def _pad_ranked(ranked, need, ball_range):
-        """概率排序号码不足 need 个时随机补充，保证不重复。"""
+        """概率排序号码不足 need 个时按号码升序补充，保证不重复且可复现。"""
         ranked = list(ranked)
-        while len(ranked) < need:
-            new_num = np.random.randint(1, ball_range + 1)
-            if new_num not in ranked:
-                ranked.append(new_num)
+        for number in range(1, ball_range + 1):
+            if len(ranked) >= need:
+                break
+            if number not in ranked:
+                ranked.append(number)
         return ranked
 
     def predict_compound(self, recent_data, extra_red=0, extra_blue=0):
@@ -2579,19 +2341,22 @@ class LotteryMLModels:
 
         Args:
             recent_data: 历史数据 DataFrame（与 predict 相同）
-            extra_red: 红球额外数量，复式红球数 = red_count + extra_red（上限为号码范围）
-            extra_blue: 蓝球额外数量，复式蓝球数 = blue_count + extra_blue
+            extra_red: 红球额外数量，复式红球数 = red_count + extra_red（上限 MAX_RED_SELECTION）
+            extra_blue: 蓝球额外数量，复式蓝球数 = blue_count + extra_blue（上限 MAX_BLUE_SELECTION）
 
         Returns:
             (red_numbers, blue_numbers) 或 (None, None)
             复式注数 = C(红球数, red_count) × C(蓝球数, blue_count)，金额 = 注数 × 2 元
         """
-        # 复式数量不能超过号码范围
-        red_need = min(self.red_count + extra_red, self.red_range)
-        blue_need = min(self.blue_count + extra_blue, self.blue_range)
-        if red_need <= self.red_count and blue_need <= self.blue_count:
-            self.log("复式数量未超出单式，退化为单式预测")
-            return self.predict(recent_data)
+        # 号码池下限为单式数量，上限为用户规则（红16/蓝6）
+        red_need = max(self.red_count,
+                       min(self.red_count + max(0, int(extra_red)), MAX_RED_SELECTION))
+        blue_need = max(self.blue_count,
+                        min(self.blue_count + max(0, int(extra_blue)), MAX_BLUE_SELECTION))
+        if red_need > self.red_range:
+            red_need = self.red_range
+        if blue_need > self.blue_range:
+            blue_need = self.blue_range
 
         red_ranked, blue_ranked = self._rank_balls(recent_data)
         if red_ranked is None or blue_ranked is None:
@@ -2614,7 +2379,8 @@ class LotteryMLModels:
         规则约束（自动截断）：
         - 红胆 1 ~ red_count-1（胆码必须少于单式个数）
         - 蓝胆 1 ~ blue_count-1（SSQ 蓝球单式只选 1 个，故 SSQ 不支持蓝胆）
-        - 拖码个数 >= 单式数-胆数，且 胆+拖 <= 号码范围
+        - 拖码个数 >= 单式数-胆数
+        - 红胆+红拖 <= MAX_RED_SELECTION(16)，蓝胆+蓝拖 <= MAX_BLUE_SELECTION(6)
 
         Args:
             recent_data: 历史数据 DataFrame
@@ -2632,12 +2398,15 @@ class LotteryMLModels:
         blue_dan_max = self.blue_count - 1 if self.blue_count >= 2 else 0
         blue_dan_count = max(0, min(blue_dan_count, blue_dan_max))
         red_tuo_min = self.red_count - red_dan_count
-        blue_tuo_min = self.blue_count - blue_dan_count if blue_dan_count >= 1 else self.blue_count
-        red_tuo_count = max(red_tuo_min, min(red_tuo_count, self.red_range - red_dan_count))
-        blue_tuo_count = max(blue_tuo_min, min(blue_tuo_count, self.blue_range - blue_dan_count))
+        blue_tuo_min = self.blue_count - blue_dan_count
+        # 胆+拖总数受用户规则限制：红 <=16，蓝 <=6
+        red_tuo_count = max(red_tuo_min,
+                            min(red_tuo_count, MAX_RED_SELECTION - red_dan_count))
+        blue_tuo_count = max(blue_tuo_min,
+                             min(blue_tuo_count, MAX_BLUE_SELECTION - blue_dan_count))
 
-        if blue_dan_count == 0 and blue_tuo_count > 0:
-            # SSQ 蓝球无胆拖空间（单式只选1个蓝球），退化为复式蓝球
+        if self.blue_count == 1 and blue_dan_count == 0:
+            # SSQ 蓝球单式只选1个，无胆拖空间，蓝球按复式出号
             self.log(f"{self.lottery_type} 蓝球单式只选1个，不支持蓝胆，蓝球按复式出号")
             red_ranked, blue_ranked = self._rank_balls(recent_data)
             if red_ranked is None or blue_ranked is None:

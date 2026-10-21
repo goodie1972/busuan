@@ -490,12 +490,12 @@ class AutoPredictThread(QThread):
                 d_red_tuo = self.dt_red_tuo if self.dt_red_tuo >= ml_model.red_count - d_red_dan else ml_model.red_count + 1
                 d_blue_dan = self.dt_blue_dan
                 d_blue_tuo = self.dt_blue_tuo if self.dt_blue_tuo >= ml_model.blue_count else ml_model.blue_count + 1
-                r_dan, b_dan, r_tuo, b_tuo, all_combos = ml_model.predict_dantuo(
+                r_dan, r_tuo, b_dan, b_tuo = ml_model.predict_dantuo(
                     recent,
                     red_dan_count=d_red_dan, red_tuo_count=d_red_tuo,
                     blue_dan_count=d_blue_dan, blue_tuo_count=d_blue_tuo
                 )
-                if not all_combos:
+                if r_dan is None:
                     self.finished_signal.emit(False, "胆拖预测失败")
                     return
                 r_dan = [int(x) for x in r_dan]
@@ -508,13 +508,25 @@ class AutoPredictThread(QThread):
                 if b_dan:
                     result_lines.append(f"  蓝胆: {' '.join(f'{n:02d}' for n in b_dan)}")
                 result_lines.append(f"  蓝拖: {' '.join(f'{n:02d}' for n in b_tuo)}")
-                result_lines.append(f"  总注数: {len(all_combos)}注")
-                result_lines.append(f"  注金额: {len(all_combos) * 2}元")
-                # 取前N组存档
-                count = min(self.num_predictions, len(all_combos))
+
+                # 生成所有胆拖组合（胆码固定 + 拖码按需取前 N 组）
+                from itertools import combinations
+                from math import comb
+                red_pick = ml_model.red_count - len(r_dan)
+                blue_pick = ml_model.blue_count - len(b_dan)
+                red_combos = list(combinations(r_tuo, red_pick)) if red_pick > 0 else [()]
+                blue_combos = list(combinations(b_tuo, blue_pick)) if blue_pick > 0 else [()]
+                total_combos = len(red_combos) * len(blue_combos)
+                result_lines.append(f"  总注数: {total_combos}注")
+                result_lines.append(f"  注金额: {total_combos * 2}元")
+                count = min(self.num_predictions, total_combos)
                 for i in range(count):
-                    red_combo, blue_combo = all_combos[i]
-                    all_predictions.append((list(red_combo), list(blue_combo), None, None))
+                    rc = red_combos[i % len(red_combos)]
+                    bc = blue_combos[i % len(blue_combos)]
+                    all_predictions.append((
+                        sorted(r_dan + list(rc)),
+                        sorted(b_dan + list(bc)),
+                        None, None))
 
             else:
                 # 单式预测（默认）
