@@ -1,0 +1,119 @@
+[
+  {
+    "ensemble_id": "test4_0",
+    "lottery_type": "dlt",
+    "target_period": 26122,
+    "verified": true,
+    "draw_red": [
+      4,
+      6,
+      10,
+      24,
+      30
+    ],
+    "draw_blue": [
+      2,
+      9
+    ],
+    "sub_performance": {
+      "gbdt": {
+        "red_hits": 1,
+        "blue_hits": 0
+      },
+      "lightgbm": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "random_forest": {
+        "red_hits": 1,
+        "blue_hits": 1
+      },
+      "xgboost": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "catboost": {
+        "red_hits": 1,
+        "blue_hits": 0
+      }
+    }
+  },
+  {
+    "ensemble_id": "test4_1",
+    "lottery_type": "dlt",
+    "target_period": 26123,
+    "verified": true,
+    "draw_red": [
+      4,
+      6,
+      10,
+      24,
+      30
+    ],
+    "draw_blue": [
+      2,
+      9
+    ],
+    "sub_performance": {
+      "gbdt": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "lightgbm": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "random_forest": {
+        "red_hits": 1,
+        "blue_hits": 1
+      },
+      "xgboost": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "catboost": {
+        "red_hits": 1,
+        "blue_hits": 0
+      }
+    }
+  },
+  {
+    "ensemble_id": "test4_2",
+    "lottery_type": "dlt",
+    "target_period": 26124,
+    "verified": true,
+    "draw_red": [
+      4,
+      6,
+      10,
+      24,
+      30
+    ],
+    "draw_blue": [
+      2,
+      9
+    ],
+    "sub_performance": {
+      "gbdt": {
+        "red_hits": 3,
+        "blue_hits": 1
+      },
+      "lightgbm": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "random_forest": {
+        "red_hits": 1,
+        "blue_hits": 1
+      },
+      "xgboost": {
+        "red_hits": 2,
+        "blue_hits": 0
+      },
+      "catboost": {
+        "red_hits": 1,
+        "blue_hits": 0
+      }
+    }
+  }
+]

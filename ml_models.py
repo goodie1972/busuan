@@ -14,6 +14,8 @@ import pandas as pd
 import pickle
 import joblib
 from math import comb
+from collections import defaultdict
+from typing import Dict, List, Tuple
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -34,6 +36,13 @@ try:
     CATBOOST_AVAILABLE = True
 except ImportError:
     CATBOOST_AVAILABLE = False
+
+# 集成预测引擎 V2
+try:
+    from ensemble_engine import EnsembleEngine, EnsemblePredictionRecorder
+    ENSEMBLE_ENGINE_AVAILABLE = True
+except ImportError:
+    ENSEMBLE_ENGINE_AVAILABLE = False
 
 # 导入期望值模型
 try:
@@ -2055,11 +2064,61 @@ class LotteryMLModels:
             return X_reshaped
 
     def _get_probability_maps(self, recent_data):
-        """返回红/蓝球逐号码概率 {0-based索引: 概率}，并写入 last_*_proba。"""
+        """返回红/蓝球逐号码概率 {0-based索引: 概率}，并写入 last_*_proba。
+        
+        如果是 ensemble 模型且集成引擎可用，使用新的 EnsembleEngine V2 算法：
+        - 每次集成预测调用5个子模型，记录中间预测结果（概率分布）
+        - 按权重汇总所有模型的概率分布，选出top号码作为最终结果
+        - 每次开奖后对中间值做确认，更新每个模型的权重
+        - 最近10次的每个模型的表现做加权平均，作为下一次预测的权重基础
+        """
         X_scaled = self._build_prediction_features(recent_data)
         if X_scaled is None:
             return None
 
+        if self.model_type == 'ensemble' and ENSEMBLE_ENGINE_AVAILABLE:
+            # 使用新的集成预测引擎 V2
+            try:
+                # 确保 ensemble_engine 已初始化
+                if not hasattr(self, '_ensemble_engine') or self._ensemble_engine is None:
+                    self._ensemble_engine = EnsembleEngine(data_dir='.')
+                
+                # 获取子模型
+                red_sub_models = self.models.get('red', {})
+                blue_sub_models = self.models.get('blue', {})
+                if not red_sub_models or not blue_sub_models:
+                    self.log("集成模型子模型为空，回退到旧算法")
+                else:
+                    # 使用引擎预测（同时记录中间结果）
+                    target_period = int(recent_data['期数'].max()) + 1 if len(recent_data) else 0
+                    
+                    result = self._ensemble_engine.predict_ensemble(
+                        lottery_type=self.lottery_type,
+                        target_period=target_period,
+                        red_sub_models=red_sub_models,
+                        blue_sub_models=blue_sub_models,
+                        X_scaled=X_scaled,
+                        red_range=self.red_range,
+                        blue_range=self.blue_range,
+                        red_pick=self.red_count,
+                        blue_pick=self.blue_count
+                    )
+                    
+                    # 保存 ensemble_id 供后续核验使用
+                    self._last_ensemble_id = result.get('ensemble_id')
+                    
+                    # 使用引擎返回的概率分布
+                    self.last_red_proba = result.get('red_proba', {})
+                    self.last_blue_proba = result.get('blue_proba', {})
+
+                    self._last_ensemble_id = result.get('ensemble_id')
+
+                    return self.last_red_proba, self.last_blue_proba
+                    
+            except Exception as e:
+                self.log(f"集成引擎预测失败，回退到旧算法: {e}")
+
+        # 旧算法（兼容所有模型类型）
         if self.model_type == 'ensemble':
             red_matrix = _ensemble_proba_matrix(
                 self.models['red'], X_scaled,
@@ -2538,6 +2597,33 @@ class LotteryMLModels:
             self._astrology_interp[variation] = interp
 
         return red, blue
+
+    def verify_ensemble(self, ensemble_id: str, draw_red: List[int], draw_blue: List[int]) -> Dict:
+        """
+        核验集成预测，更新模型权重
+        
+        使用 EnsembleEngine V2 的核验逻辑：
+        1. 标记已核验，计算每个子模型的表现
+        2. 更新EWMA
+        3. 计算最近10次加权平均
+        4. Softmax -> 新权重
+        
+        Args:
+            ensemble_id: 集成预测ID
+            draw_red: 开奖红球号码
+            draw_blue: 开奖蓝球号码
+            
+        Returns:
+            核验结果字典
+        """
+        if not ENSEMBLE_ENGINE_AVAILABLE:
+            return {'error': '集成引擎不可用'}
+        
+        if not hasattr(self, '_ensemble_engine') or self._ensemble_engine is None:
+            self._ensemble_engine = EnsembleEngine(data_dir='.')
+        
+        return self._ensemble_engine.verify_ensemble(ensemble_id, draw_red, draw_blue)
+
 # 使用示例
 def demo():
     # 加载数据
