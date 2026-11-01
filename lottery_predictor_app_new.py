@@ -1820,8 +1820,39 @@ class LotteryPredictorApp(QMainWindow):
         self.update_log("数据更新线程已结束。")
         # 同步CSV到数据库
         self.sync_csv_to_database()
+        # 显示最新开奖数据
+        self._show_latest_draw()
         # 数据更新完成后自动核验所有预测记录（有开奖数据即可核验）
         self.auto_verify_after_update()
+
+    def _show_latest_draw(self):
+        """显示最新开奖数据"""
+        try:
+            from db_access import get_connection, get_latest_period
+            # 使用 get_latest_period 获取最新期号
+            lottery_key = self._current_lottery_key()
+            latest_period = get_latest_period(lottery_key)
+            if latest_period:
+                # 获取该期的详细开奖数据
+                from db_access import get_lottery_draws
+                draws = get_lottery_draws(lottery_key, limit=1)
+                if draws:
+                    d = draws[0]
+                    period = d['period']
+                    draw_date = d['draw_date']
+                    red_numbers = d['red_numbers']
+                    blue_numbers = d['blue_numbers']
+                    self.update_log(f"🎯 最新开奖: 第{period}期 ({draw_date})")
+                    self.update_log(f"   红球: {red_numbers}  蓝球: {blue_numbers}")
+                    return
+            self.update_log("暂无开奖数据")
+        except Exception as e:
+            self.update_log(f"获取最新开奖失败: {e}")
+
+    def _current_lottery_key(self):
+        """获取当前选中的彩票类型 key"""
+        selected_index = self.lottery_combo.currentIndex()
+        return ['ssq', 'dlt'][selected_index]
 
     def sync_csv_to_database(self):
         """同步CSV开奖数据到数据库"""
