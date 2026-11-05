@@ -8,9 +8,12 @@ import sys
 import time
 import logging
 import subprocess
+from math import comb
 import torch
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
-from ml_models import LotteryMLModels, MODEL_TYPES
+from ml_models import (
+    LotteryMLModels, MODEL_TYPES, ball_proba_list, top_note_combos,
+)
 
 # 在主线程(应用启动时)预加载模型优化相关模块的原生依赖(sklearn/joblib等)。
 # 若留到后台工作线程内首次 import, 原生库加载与 torch 的 OpenMP 运行时
@@ -470,19 +473,22 @@ class AutoPredictThread(QThread):
                 result_lines.append(f"【复式】红球{len(red_numbers)}选{ml_model.red_count} + 蓝球{len(blue_numbers)}选{ml_model.blue_count}")
                 result_lines.append(f"  红球: {' '.join(f'{n:02d}' for n in red_numbers)}")
                 result_lines.append(f"  蓝球: {' '.join(f'{n:02d}' for n in blue_numbers)}")
-                # 生成所有组合
-                from itertools import combinations
-                red_combos = list(combinations(red_numbers, ml_model.red_count))
-                blue_combos = list(combinations(blue_numbers, ml_model.blue_count))
-                total_combos = len(red_combos) * len(blue_combos)
-                result_lines.append(f"  总注数: {total_combos}注 ({len(red_combos)}×{len(blue_combos)})")
+                # 总注数 = C(复式红球数, 单式红) × C(复式蓝球数, 单式蓝)
+                red_combo_count = comb(len(red_numbers), ml_model.red_count)
+                blue_combo_count = comb(len(blue_numbers), ml_model.blue_count)
+                total_combos = red_combo_count * blue_combo_count
+                result_lines.append(f"  总注数: {total_combos}注 ({red_combo_count}×{blue_combo_count})")
                 result_lines.append(f"  注金额: {total_combos * 2}元")
-                # 取前N组存档
-                count = min(self.num_predictions, total_combos)
-                for i in range(count):
-                    rc = red_combos[i % len(red_combos)]
-                    bc = blue_combos[i % len(blue_combos)]
-                    all_predictions.append((list(rc), list(bc), None, None))
+                # 按整注概率降序取前 N 注存档（原来取字典序前 N，号码全压在小号段）
+                rp = getattr(ml_model, 'last_red_proba', None)
+                bp = getattr(ml_model, 'last_blue_proba', None)
+                for rc, bc in top_note_combos(
+                        red_numbers, blue_numbers,
+                        ml_model.red_count, ml_model.blue_count,
+                        rp, bp, self.num_predictions):
+                    all_predictions.append(
+                        (list(rc), list(bc),
+                         ball_proba_list(rp, rc), ball_proba_list(bp, bc)))
 
             elif self.predict_mode == "胆拖":
                 # 胆拖预测
@@ -509,29 +515,30 @@ class AutoPredictThread(QThread):
                     result_lines.append(f"  蓝胆: {' '.join(f'{n:02d}' for n in b_dan)}")
                 result_lines.append(f"  蓝拖: {' '.join(f'{n:02d}' for n in b_tuo)}")
 
-                # 生成所有胆拖组合（胆码固定 + 拖码按需取前 N 组）
-                from itertools import combinations
-                from math import comb
+                # 胆码固定，注数由拖码组合决定；取注同样按整注概率降序
                 red_pick = ml_model.red_count - len(r_dan)
                 blue_pick = ml_model.blue_count - len(b_dan)
-                red_combos = list(combinations(r_tuo, red_pick)) if red_pick > 0 else [()]
-                blue_combos = list(combinations(b_tuo, blue_pick)) if blue_pick > 0 else [()]
-                total_combos = len(red_combos) * len(blue_combos)
+                total_combos = comb(len(r_tuo), red_pick) * comb(len(b_tuo), blue_pick)
                 result_lines.append(f"  总注数: {total_combos}注")
                 result_lines.append(f"  注金额: {total_combos * 2}元")
-                count = min(self.num_predictions, total_combos)
-                for i in range(count):
-                    rc = red_combos[i % len(red_combos)]
-                    bc = blue_combos[i % len(blue_combos)]
+                rp = getattr(ml_model, 'last_red_proba', None)
+                bp = getattr(ml_model, 'last_blue_proba', None)
+                for rc, bc in top_note_combos(
+                        r_tuo, b_tuo, red_pick, blue_pick, rp, bp,
+                        self.num_predictions):
+                    red_note = sorted(r_dan + list(rc))
+                    blue_note = sorted(b_dan + list(bc))
                     all_predictions.append((
-                        sorted(r_dan + list(rc)),
-                        sorted(b_dan + list(bc)),
-                        None, None))
+                        red_note, blue_note,
+                        ball_proba_list(rp, red_note), ball_proba_list(bp, blue_note)))
 
             else:
                 # 单式预测（默认）
                 for i in range(self.num_predictions):
                     red, blue = ml_model.predict(recent, variation=i)
+                    if not red or not blue:
+                        self.finished_signal.emit(False, "单式预测失败")
+                        return
                     if self.lottery_type == 'dlt':
                         line = f"  第{i+1}组: {' '.join(f'{n:02d}' for n in red)} + {' '.join(f'{n:02d}' for n in blue)}"
                     else:
@@ -539,9 +546,9 @@ class AutoPredictThread(QThread):
                     result_lines.append(line)
                     rp = getattr(ml_model, 'last_red_proba', None)
                     bp = getattr(ml_model, 'last_blue_proba', None)
-                    red_proba = ([float(rp.get(int(n) - 1, 0.0)) for n in red] if isinstance(rp, dict) else None)
-                    blue_proba = ([float(bp.get(int(n) - 1, 0.0)) for n in blue] if isinstance(bp, dict) else None)
-                    all_predictions.append((list(red), list(blue), red_proba, blue_proba))
+                    all_predictions.append((
+                        list(red), list(blue),
+                        ball_proba_list(rp, red), ball_proba_list(bp, blue)))
 
             result_text = "\n".join(result_lines)
             self.log_signal.emit("预测生成完成。")

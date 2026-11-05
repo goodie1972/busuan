@@ -441,6 +441,32 @@ def test_model_load_failure_is_retried_on_next_click(window, monkeypatch):
     assert len(rows) == 2, text
 
 
+def test_verify_records_button_renders_period_summary(window, monkeypatch):
+    """历史回测页"核验"曾因 import 不存在的 format_verify_summary 而必然失败。"""
+    import prediction_records
+
+    report = {
+        'total': 3, 'verified': 2, 'pending': 1, 'win_count': 1,
+        'prize_total_fixed': 5, 'prize_counts': {'六等奖': 1},
+        'records': [
+            {'lottery_type': 'ssq', 'model_type': 'lightgbm', 'latest_period': 26110,
+             'target_period': 26111, 'red_hits': 1, 'blue_hits': 1,
+             'prize_name': '六等奖', 'prize_amount': 5},
+            {'lottery_type': 'ssq', 'model_type': 'lightgbm', 'latest_period': 26110,
+             'target_period': 26111, 'red_hits': 0, 'blue_hits': 0,
+             'prize_name': '未中奖', 'prize_amount': 0},
+        ],
+    }
+    monkeypatch.setattr(prediction_records, 'verify_records', lambda **kwargs: report)
+
+    window.verify_prediction_records()
+
+    text = window.bt_result_text.toPlainText()
+    assert '核验失败' not in text, text
+    assert '中奖期' in text, text
+    assert window.bt_status_label.text() == "核验完成"
+
+
 def test_empty_record_actions_do_not_block(window, qapp, fake_dialogs):
     window.tab_widget.setCurrentIndex(window.tab_widget.indexOf(window.records_tab))
     window.rec_refresh_btn.click()

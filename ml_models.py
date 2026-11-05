@@ -14,6 +14,7 @@ import pandas as pd
 import pickle
 import joblib
 from math import comb
+from itertools import combinations
 from collections import defaultdict
 from typing import Dict, List, Tuple
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -685,6 +686,61 @@ def _mean_confidence(proba_map, numbers):
         return None
     vals = [proba_map.get(int(num) - 1, 0.0) for num in numbers]
     return float(np.mean(vals)) if vals else None
+
+
+def _note_score(combo, proba):
+    """一注（或注的一部分）的模型概率：注内各球概率的乘积，缺概率按 0 计。"""
+    p = 1.0
+    for num in combo:
+        p *= float((proba or {}).get(int(num) - 1, 0.0))
+    return p
+
+
+def ball_proba_list(proba_map, numbers):
+    """按号码取模型概率（概率键为 0-based 类别索引）。
+
+    概率不可用（非 dict，如期望值模型给出的列表）时返回 None，
+    存档退化为"无概率"记录，仍照常入库。
+    """
+    if not isinstance(proba_map, dict) or not proba_map or not numbers:
+        return None
+    return [float(proba_map.get(int(n) - 1, 0.0)) for n in numbers]
+
+
+def top_note_combos(red_numbers, blue_numbers, red_pick, blue_pick,
+                    red_proba, blue_proba, count):
+    """按整注概率降序取前 count 注（复式/胆拖共用）。
+
+    整注概率 = 红球组合概率 × 蓝球组合概率，两侧可分离，所以先各自降序，
+    再对笛卡尔积按乘积降序取前 count。概率缺失时退化为 itertools.combinations
+    的原有顺序，保证仍能出注、仍能存档。
+
+    Returns:
+        List[Tuple[tuple, tuple]]: [(红球组合, 蓝球组合), ...]，长度 <= count
+    """
+    count = max(0, int(count))
+    red_pick = int(red_pick)
+    blue_pick = int(blue_pick)
+    if count == 0 or red_pick < 0 or blue_pick < 0:
+        return []
+    # 概率图只认 dict（期望值模型给的是列表）；不可用时退化为组合原序
+    red_proba = red_proba if isinstance(red_proba, dict) else None
+    blue_proba = blue_proba if isinstance(blue_proba, dict) else None
+
+    red_combos = list(combinations(sorted(red_numbers or []), red_pick))
+    blue_combos = list(combinations(sorted(blue_numbers or []), blue_pick))
+    if not red_combos or not blue_combos:
+        return []
+
+    has_proba = bool(red_proba) or bool(blue_proba)
+    if not has_proba:
+        return [(rc, bc) for rc in red_combos for bc in blue_combos][:count]
+
+    scored = [(_note_score(rc, red_proba) * _note_score(bc, blue_proba), rc, bc)
+              for rc in red_combos for bc in blue_combos]
+    # 同分按号码升序，保证同一批概率永远给出同一批注
+    scored.sort(key=lambda x: (-x[0], x[1], x[2]))
+    return [(rc, bc) for _s, rc, bc in scored[:count]]
 
 
 class LotteryMLModels:
@@ -2106,14 +2162,17 @@ class LotteryMLModels:
                     
                     # 保存 ensemble_id 供后续核验使用
                     self._last_ensemble_id = result.get('ensemble_id')
-                    
+
                     # 使用引擎返回的概率分布
-                    self.last_red_proba = result.get('red_proba', {})
-                    self.last_blue_proba = result.get('blue_proba', {})
-
-                    self._last_ensemble_id = result.get('ensemble_id')
-
-                    return self.last_red_proba, self.last_blue_proba
+                    red_proba = result.get('red_proba') or {}
+                    blue_proba = result.get('blue_proba') or {}
+                    if red_proba and blue_proba:
+                        self.last_red_proba = red_proba
+                        self.last_blue_proba = blue_proba
+                        return red_proba, blue_proba
+                    # 引擎没给出概率（子模型名与权重表对不上等），
+                    # 继续往下走旧算法，绝不能让空图补齐成 1..N
+                    self.log("集成引擎无概率输出，回退到旧算法")
                     
             except Exception as e:
                 self.log(f"集成引擎预测失败，回退到旧算法: {e}")
@@ -2375,22 +2434,47 @@ class LotteryMLModels:
             return None, None
         red_proba, blue_proba = maps
 
+        # 丢弃越界类别索引：跨彩种复用同一模型实例时，概率图可能带着
+        # 另一个彩种的号码键（如大乐透后区出现索引 12 = 号码 13）。
         red_ranked = [k + 1 for k, _ in sorted(
-            red_proba.items(), key=lambda kv: (-kv[1], kv[0]))]
+            ((int(i), float(p)) for i, p in red_proba.items()
+             if 0 <= int(i) < self.red_range),
+            key=lambda kv: (-kv[1], kv[0]))]
         blue_ranked = [k + 1 for k, _ in sorted(
-            blue_proba.items(), key=lambda kv: (-kv[1], kv[0]))]
+            ((int(i), float(p)) for i, p in blue_proba.items()
+             if 0 <= int(i) < self.blue_range),
+            key=lambda kv: (-kv[1], kv[0]))]
         return red_ranked, blue_ranked
 
     @staticmethod
     def _pad_ranked(ranked, need, ball_range):
-        """概率排序号码不足 need 个时按号码升序补充，保证不重复且可复现。"""
-        ranked = list(ranked)
-        for number in range(1, ball_range + 1):
-            if len(ranked) >= need:
-                break
-            if number not in ranked:
-                ranked.append(number)
-        return ranked
+        """概率排序号码不足 need 个时补齐。
+
+        - 已排好序的号码原样保留在前面（胆拖靠位置切分胆/拖）
+        - 空输入直接返回空：一个号码都没有说明模型没给出概率，
+          此时造一注"模型没说过的号"比不预测更糟
+        - 补位号码在整个号码区间内等距取点，不再从最小号开始，
+          避免整批存档被压进小号段
+        """
+        cleaned = []
+        for number in ranked or []:
+            n = int(number)
+            if 1 <= n <= ball_range and n not in cleaned:
+                cleaned.append(n)
+        if not cleaned:
+            return []
+
+        missing = need - len(cleaned)
+        if missing <= 0:
+            return cleaned
+
+        candidates = [n for n in range(1, ball_range + 1) if n not in cleaned]
+        if missing > len(candidates):
+            missing = len(candidates)
+        step = len(candidates) / (missing + 1)
+        for i in range(missing):
+            cleaned.append(candidates[int((i + 1) * step)])
+        return cleaned
 
     def predict_compound(self, recent_data, extra_red=0, extra_blue=0):
         """
@@ -2418,7 +2502,8 @@ class LotteryMLModels:
             blue_need = self.blue_range
 
         red_ranked, blue_ranked = self._rank_balls(recent_data)
-        if red_ranked is None or blue_ranked is None:
+        if not red_ranked or not blue_ranked:
+            self.log("模型未给出有效概率排序，复式不输出号码")
             return None, None
 
         red_ranked = self._pad_ranked(red_ranked, red_need, self.red_range)
@@ -2468,7 +2553,8 @@ class LotteryMLModels:
             # SSQ 蓝球单式只选1个，无胆拖空间，蓝球按复式出号
             self.log(f"{self.lottery_type} 蓝球单式只选1个，不支持蓝胆，蓝球按复式出号")
             red_ranked, blue_ranked = self._rank_balls(recent_data)
-            if red_ranked is None or blue_ranked is None:
+            if not red_ranked or not blue_ranked:
+                self.log("模型未给出有效概率排序，胆拖不输出号码")
                 return None, None, None, None
             red_total = red_dan_count + red_tuo_count
             blue_need = min(blue_tuo_count, self.blue_range)
@@ -2484,7 +2570,8 @@ class LotteryMLModels:
             return red_dan, red_tuo, [], blue_tuo
 
         red_ranked, blue_ranked = self._rank_balls(recent_data)
-        if red_ranked is None or blue_ranked is None:
+        if not red_ranked or not blue_ranked:
+            self.log("模型未给出有效概率排序，胆拖不输出号码")
             return None, None, None, None
 
         red_total = red_dan_count + red_tuo_count

@@ -20,25 +20,31 @@ import sqlite3
 import tempfile
 import shutil
 from datetime import datetime
+from pathlib import Path
 
-# 测试前备份
-DB_PATH = "busuan.db"
-BACKUP_DIR = "_test_backup"
+# 所有写操作只进临时沙盒库：这些用例会并发插入、回滚、备份恢复，
+# 直接跑在生产 busuan.db 上会留下假预测甚至覆盖真实记录。
+_project_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_project_dir, 'tests'))
+import db_sandbox  # noqa: E402
+
+SANDBOX_DB = Path(db_sandbox.activate())
+
+# 备份目录也隔离，避免测试备份堆进项目 backup/
+import db_backup  # noqa: E402
+BACKUP_DIR = Path(tempfile.mkdtemp(prefix='busuan_backup_'))
+db_backup.BACKUP_DIR = BACKUP_DIR
+
 
 def setup():
-    """测试前准备"""
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    if os.path.exists(DB_PATH):
-        shutil.copy2(DB_PATH, os.path.join(BACKUP_DIR, f"busuan_pre_test_{int(time.time())}.db"))
+    """测试前准备（沙盒库已就绪，无需再备份生产库）。"""
+    BACKUP_DIR.mkdir(exist_ok=True)
+
 
 def teardown():
-    """测试后清理"""
-    # 恢复原始数据库
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
-    backups = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith("busuan_pre_test_")])
-    if backups:
-        shutil.copy2(os.path.join(BACKUP_DIR, backups[-1]), DB_PATH)
+    """测试后清理：只删临时目录，不碰任何生产文件。"""
+    shutil.rmtree(BACKUP_DIR, ignore_errors=True)
+    SANDBOX_DB.unlink(missing_ok=True)
 
 
 def test_concurrent_writes():

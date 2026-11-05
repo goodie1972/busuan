@@ -15,18 +15,38 @@
 3. GUI 调用：在"系统设置"页添加"立即备份"按钮
 """
 import os
-import shutil
+import sqlite3
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# 数据库文件路径
-DB_FILE = Path(__file__).parent / 'busuan.db'
+from db_access import get_db_path
+
 BACKUP_DIR = Path(__file__).parent / 'backup'
 BACKUP_DIR.mkdir(exist_ok=True)
 
 # 备份保留天数
 RETENTION_DAYS = 30
+
+
+def get_db_file() -> Path:
+    """当前生效的数据库文件，路径来源与 db_access 一致（BUSUAN_DB 优先）。"""
+    return Path(get_db_path()).resolve()
+
+
+def _copy_db(src: Path, dst: Path):
+    """用 SQLite backup API 整库复制。
+
+    不能用 shutil.copy：WAL 模式下最近提交的数据还在 -wal 里，只拷主文件会丢；
+    反向恢复时只拷主文件又会留下与主库不匹配的旧 -wal，重放后数据错乱。
+    """
+    src_conn = sqlite3.connect(str(src))
+    dst_conn = sqlite3.connect(str(dst))
+    try:
+        src_conn.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src_conn.close()
 
 
 def backup_database(note: str = '') -> str:
@@ -39,22 +59,22 @@ def backup_database(note: str = '') -> str:
     Returns:
         str: 备份文件路径；失败返回空字符串
     """
-    if not DB_FILE.exists():
-        print(f"[ERROR] Database not found: {DB_FILE}")
+    db_file = get_db_file()
+    if not db_file.exists():
+        print(f"[ERROR] Database not found: {db_file}")
         return ''
     
     try:
-        # 生成备份文件名
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # 生成备份文件名（带微秒，避免同一秒内的两次备份互相覆盖）
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S%f')
         note_suffix = f'_{note}' if note else ''
         backup_file = BACKUP_DIR / f'busuan_{timestamp}{note_suffix}.db'
-        
-        # 复制文件
-        shutil.copy2(DB_FILE, backup_file)
-        
+
+        _copy_db(db_file, backup_file)
+
         file_size = backup_file.stat().st_size
         print(f"[OK] Backup created: {backup_file.name} ({file_size / 1024:.1f} KB)")
-        
+
         return str(backup_file)
     except Exception as e:
         print(f"[ERROR] Backup failed: {e}")
@@ -135,12 +155,14 @@ def restore_backup(backup_name: str, confirm: bool = False) -> bool:
     
     try:
         # 先备份当前数据库（防误操作）
-        if DB_FILE.exists():
+        db_file = get_db_file()
+        if db_file.exists():
             emergency_backup = backup_database(note='pre_restore')
-            print(f"[Safety] Current DB backed up to: {Path(emergency_backup).name}")
-        
+            if emergency_backup:
+                print(f"[Safety] Current DB backed up to: {Path(emergency_backup).name}")
+
         # 恢复
-        shutil.copy2(backup_file, DB_FILE)
+        _copy_db(backup_file, db_file)
         print(f"[OK] Database restored from: {backup_name}")
         return True
     except Exception as e:
@@ -185,7 +207,7 @@ def schedule_daily_backup():
 
 if __name__ == "__main__":
     print("=== Database Backup Tool ===")
-    print(f"Database: {DB_FILE}")
+    print(f"Database: {get_db_file()}")
     print(f"Backup directory: {BACKUP_DIR}")
     print()
     

@@ -320,6 +320,127 @@ def verify_records(log_callback=None, records_subset=None):
     }
 
 
+# 单注金额（元）
+NOTE_PRICE = 2
+
+
+def summarize_by_period(records, note_price=NOTE_PRICE):
+    """按 (彩票类型, 目标期) 聚合已核验记录。
+
+    统计样本单位是"期"：复式/胆拖一次预测会存档几十注，它们买的是同一张票、
+    对同一期开奖，按注统计会把同一期的结果重复计入，注数越多的期权重越大。
+    注数在这里只作为该期的投入权重。
+
+    Args:
+        records: load_records()/verify_records() 记录的列表
+        note_price: 单注金额，用于折算投入
+
+    Returns:
+        dict: {'periods_detail': [每期统计], 'overall': {整体统计}, 'pending_notes': int}
+    """
+    groups = {}
+    pending_notes = 0
+    for rec in records or []:
+        period = rec.get('target_period')
+        if period is None:
+            pending_notes += 1
+            continue
+        groups.setdefault((rec.get('lottery_type'), int(period)), []).append(rec)
+
+    periods_detail = []
+    for (lottery_type, period), notes in groups.items():
+        prizes = [rec.get('prize_amount') or 0 for rec in notes]
+        red_hits = [rec.get('red_hits') for rec in notes
+                    if rec.get('red_hits') is not None]
+        blue_hits = [rec.get('blue_hits') for rec in notes
+                     if rec.get('blue_hits') is not None]
+        win_notes = sum(1 for p in prizes if p > 0)
+        periods_detail.append({
+            'lottery_type': lottery_type,
+            'target_period': period,
+            'notes': len(notes),
+            'stake': len(notes) * note_price,
+            'prize': sum(prizes),
+            'win_notes': win_notes,
+            'red_hits_avg': sum(red_hits) / len(red_hits) if red_hits else 0.0,
+            'blue_hits_avg': sum(blue_hits) / len(blue_hits) if blue_hits else 0.0,
+            'is_win': win_notes > 0,
+        })
+    periods_detail.sort(key=lambda p: (p['lottery_type'] or '', p['target_period']))
+
+    total_notes = sum(p['notes'] for p in periods_detail)
+    total_stake = sum(p['stake'] for p in periods_detail)
+    total_prize = sum(p['prize'] for p in periods_detail)
+    win_periods = sum(1 for p in periods_detail if p['is_win'])
+    win_notes = sum(p['win_notes'] for p in periods_detail)
+
+    overall = {
+        'periods': len(periods_detail),
+        'win_periods': win_periods,
+        'period_win_rate': win_periods / len(periods_detail) if periods_detail else 0.0,
+        'notes': total_notes,
+        'note_win_rate': win_notes / total_notes if total_notes else 0.0,
+        'stake': total_stake,
+        'prize': total_prize,
+        'net': total_prize - total_stake,
+        'roi': (total_prize - total_stake) / total_stake if total_stake else 0.0,
+    }
+    return {'periods_detail': periods_detail,
+            'overall': overall,
+            'pending_notes': pending_notes}
+
+
+def format_verify_summary(report, note_price=NOTE_PRICE):
+    """把核验报告渲染成文本：期口径为主，注口径只作对照展示。"""
+    if not report:
+        return "暂无核验结果。"
+
+    summary = summarize_by_period(report.get('records') or [], note_price)
+    overall = summary['overall']
+    periods = overall['periods']
+
+    lines = ["═══ 核验汇总（按期统计）═══"]
+    lines.append(f"记录 {report.get('total', 0)} 条，"
+                 f"已核验 {report.get('verified', 0)} 注，"
+                 f"待开奖 {summary['pending_notes']} 注")
+
+    if not periods:
+        lines.append("已核验记录为 0 期，暂无可统计的开奖结果。")
+        return "\n".join(lines)
+
+    by_lottery = {}
+    for detail in summary['periods_detail']:
+        by_lottery[detail['lottery_type']] = \
+            by_lottery.get(detail['lottery_type'], 0) + 1
+    coverage = " / ".join(f"{str(lt).upper()} {cnt} 期"
+                          for lt, cnt in sorted(by_lottery.items(),
+                                                key=lambda kv: str(kv[0])))
+
+    lines.append(f"覆盖期数: {periods} 期（{coverage}）")
+    lines.append(f"中奖期: {overall['win_periods']}/{periods} 期"
+                 f" = {overall['period_win_rate'] * 100:.2f}%")
+    lines.append(f"按注对照: {overall['notes']} 注中 "
+                 f"{round(overall['note_win_rate'] * overall['notes'])} 注"
+                 f" = {overall['note_win_rate'] * 100:.2f}%（复式一期多注，勿当期口径）")
+    lines.append(f"投入 {overall['stake']:.0f} 元，奖金 {overall['prize']:.0f} 元，"
+                 f"净{('盈' if overall['net'] >= 0 else '亏')} {abs(overall['net']):.0f} 元，"
+                 f"ROI {overall['roi'] * 100:+.2f}%")
+
+    prize_counts = report.get('prize_counts') or {}
+    for prize_name, cnt in sorted(prize_counts.items(), key=lambda kv: str(kv[0])):
+        lines.append(f"  {prize_name}: {cnt} 次")
+
+    lines.append("分期明细（最近 10 期）:")
+    for detail in summary['periods_detail'][-10:]:
+        lines.append(
+            f"  [{str(detail['lottery_type']).upper()}] 期{detail['target_period']}: "
+            f"{detail['notes']}注 投入{detail['stake']}元 "
+            f"奖金{detail['prize']}元 红均{detail['red_hits_avg']:.2f} "
+            f"蓝均{detail['blue_hits_avg']:.2f}"
+            f"{' ★中奖' if detail['is_win'] else ''}")
+    return "\n".join(lines)
+
+
 def export_to_json():
     """导出预测记录到 JSON 文件（手动备份用）"""
     import json

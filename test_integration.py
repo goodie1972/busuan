@@ -11,6 +11,14 @@ project_dir = os.path.dirname(os.path.abspath(__file__))
 if project_dir not in sys.path:
     sys.path.insert(0, project_dir)
 
+# 预测存档必须落进临时沙盒库：这些用例走真实的 add_prediction_record，
+# 直接写生产 busuan.db 会留下 latest_period=1000 之类的假预测，
+# 而集成模型的权重回测会把它们当真实样本消费。
+sys.path.insert(0, os.path.join(project_dir, 'tests'))
+import db_sandbox  # noqa: E402
+
+db_sandbox.activate()
+
 def test_save_prediction_records():
     """测试 _save_prediction_records 方法能正确处理各种输入"""
     print("测试 _save_prediction_records 方法...")

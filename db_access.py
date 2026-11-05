@@ -16,6 +16,7 @@ SQLite 数据库访问层 (Data Access Layer)
 
 import sqlite3
 import json
+import os
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -24,8 +25,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 数据库路径
+# 数据库路径（相对当前工作目录）；环境变量 BUSUAN_DB 优先，供测试/多实例隔离
 DB_PATH = "busuan.db"
+
+
+def get_db_path() -> str:
+    """返回当前生效的数据库路径。
+
+    运行期读取环境变量而非模块常量，使测试会话可以用 BUSUAN_DB 指向临时库，
+    避免假预测写进生产库后被权重回测当成真实样本。
+    """
+    return os.environ.get('BUSUAN_DB') or DB_PATH
 
 
 # ============================================================
@@ -35,7 +45,7 @@ DB_PATH = "busuan.db"
 @contextmanager
 def get_connection():
     """获取数据库连接（context manager）"""
-    conn = sqlite3.connect(DB_PATH, timeout=10.0)  # 10秒等待锁
+    conn = sqlite3.connect(get_db_path(), timeout=10.0)  # 10秒等待锁
     conn.row_factory = sqlite3.Row  # 返回字典式结果
     # 启用 WAL 模式（提高并发读写性能）
     try:
