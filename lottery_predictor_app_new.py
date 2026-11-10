@@ -1886,6 +1886,41 @@ class LotteryPredictorApp(QMainWindow):
             self.update_log("自动核验：检查是否有新开奖数据可核验...")
             report = verify_records(
                 log_callback=lambda msg: self.log_emitter.new_log.emit(msg))
+
+            # 同时核验集成模型记录
+            try:
+                from ensemble_engine import EnsembleEngine
+                engine = EnsembleEngine(data_dir='.')
+
+                # 获取未核验的集成预测记录
+                ensemble_verified = 0
+                for record in engine.recorder.records:
+                    if (not record.get('verified')
+                        and record.get('ensemble_id')
+                        and record.get('target_period')):
+                        # 查找开奖数据
+                        from db_access import get_lottery_draws
+                        draws = get_lottery_draws(record['lottery_type'], limit=None)
+                        draw = next((d for d in draws if d['period'] == record['target_period']), None)
+                        if draw:
+                            result = engine.verify_ensemble(
+                                record['ensemble_id'],
+                                draw['red_numbers'],
+                                draw['blue_numbers']
+                            )
+                            if 'error' not in result:
+                                ensemble_verified += 1
+                                lt = record['lottery_type'].upper()
+                                tp = record['target_period']
+                                self.update_log(f"集成核验 [{lt}] {tp}: 权重已更新")
+
+                if ensemble_verified > 0:
+                    self.update_log(f"集成模型自动核验完成：核验 {ensemble_verified} 条")
+                    self._refresh_model_weights()
+
+            except Exception as e:
+                self.update_log(f"集成模型核验失败: {e}")
+
             self.refresh_prediction_records()
             self._refresh_model_weights()
             verified = report.get('verified', 0)

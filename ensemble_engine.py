@@ -35,6 +35,7 @@ ALPHA = 0.3              # EWMA平滑系数
 TAU = 0.1                # Softmax温度参数
 MIN_SAMPLES = 5          # 最小样本数（不足时收缩向0）
 RECENT_WINDOW = 10       # 最近N次加权平均的窗口大小
+EMA_WINDOW = 20          # EWMA 累计历史窗口（20期）
 DECAY_FACTOR = 0.9       # 近期权重衰减因子
 STREAK_BONUS_BASE = 0.05 # 连续命中加成基数
 TREND_BONUS_RATE = 0.1   # 趋势加成系数
@@ -115,40 +116,47 @@ def compute_accel_factor(hit_history: List[Tuple[int, int]]) -> float:
     return 1.0
 
 
-def compute_model_score(hit_history: List[Tuple[int, int]], 
+def compute_model_score(hit_history: List[Tuple[int, int]],
                         red_pick: int, blue_pick: int,
                         baseline: Dict) -> float:
     """计算单个模型的综合得分"""
     if not hit_history:
         return 0.0
-    
+
     # 最近一次命中数
     latest_red, latest_blue = hit_history[-1]
-    
+
     # 基础超额命中率
     red_rate = latest_red / red_pick if red_pick > 0 else 0
     blue_rate = latest_blue / blue_pick if blue_pick > 0 else 0
     excess_base = (red_rate - baseline['red']) + (blue_rate - baseline['blue'])
-    
-    # 连续命中加成（连续不下降的次数）
-    streak = 1
-    for i in range(len(hit_history) - 1, 0, -1):
-        if (hit_history[i][0] >= hit_history[i-1][0] and 
-            hit_history[i][1] >= hit_history[i-1][1]):
+
+    # 连续命中加成（连续超越基线且不下降的次数，最多MAX_STREAK）
+    # 只奖励真正有表现的期数，避免全是1命中时的虚假长streak
+    MAX_STREAK = 10  # 连续加成上限
+    streak = 0
+    for i in range(len(hit_history) - 1, -1, -1):
+        r, b = hit_history[i]
+        r_rate = r / red_pick if red_pick > 0 else 0
+        b_rate = b / blue_pick if blue_pick > 0 else 0
+        excess = (r_rate - baseline['red']) + (b_rate - baseline['blue'])
+        if excess > 0:  # 超过基线才算
             streak += 1
         else:
             break
+        if streak >= MAX_STREAK:
+            break
     streak_bonus = compute_streak_bonus(streak)
-    
+
     # 趋势加成
     trend_bonus = compute_trend_bonus(hit_history)
-    
+
     # 加速因子
     accel = compute_accel_factor(hit_history)
-    
+
     # 综合得分
     score = (excess_base + streak_bonus + trend_bonus) * accel
-    
+
     return score
 
 
@@ -209,8 +217,15 @@ class EnsemblePredictionRecorder:
             return []
     
     def _save(self):
-        with open(self.file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.records, f, ensure_ascii=False, indent=2)
+        import tempfile
+        import os
+        # Write to temp file first, then atomic rename
+        with tempfile.NamedTemporaryFile('w', encoding='utf-8', 
+                                        dir=os.path.dirname(self.file_path) or '.',
+                                        delete=False) as tmp:
+            json.dump(self.records, tmp, ensure_ascii=False, indent=2)
+            tmp_path = tmp.name
+        os.replace(tmp_path, self.file_path)
     
     def record_prediction(self, lottery_type: str, target_period: int,
                          sub_predictions: Dict[str, Dict],
@@ -271,7 +286,12 @@ class EnsemblePredictionRecorder:
         return sub_performance
     
     def get_model_hit_history(self, lottery_type: str, model_name: str) -> List[Tuple[int, int]]:
-        """获取指定模型的历史命中数序列 [(red_hits, blue_hits), ...]"""
+        """获取指定模型的历史命中数序列 [(red_hits, blue_hits), ...]
+        
+        优先从 ensemble_predictions.json 读取（含中间值），
+        兼容旧的 prediction_records.py 数据
+        去重：同一 target_period 只保留最新的一条
+        """
         history = []
         for r in self.records:
             if (r.get('lottery_type') == lottery_type
@@ -279,56 +299,138 @@ class EnsemblePredictionRecorder:
                 and r.get('sub_performance', {}).get(model_name)):
                 perf = r['sub_performance'][model_name]
                 history.append((perf['red_hits'], perf['blue_hits']))
+        
+        # 兼容旧的 prediction_history.json 数据
+        # 这些记录有 target_period 和 red_hits/blue_hits，但可能没有 has_drawn 字段
+        try:
+            from prediction_records import load_records
+            records = load_records()
+            # 去重：同一 target_period 只保留最后一条
+            seen_periods = set()
+            deduped = []
+            for r in reversed(records):  # 从最新往回遍历
+                if (r.get('lottery_type') == lottery_type
+                    and r.get('model_type') == model_name
+                    and r.get('red_hits') is not None
+                    and r.get('blue_hits') is not None
+                    and r.get('target_period') is not None):
+                    period = r['target_period']
+                    if period not in seen_periods:
+                        seen_periods.add(period)
+                        deduped.append((r['red_hits'], r['blue_hits']))
+            # 恢复时间顺序
+            history.extend(reversed(deduped))
+        except:
+            pass
+        
         return history
 
 
 # ============ 权重计算 ============
 
 class EnsembleWeightCalculator:
-    """计算集成模型的动态权重"""
-    
+    """计算集成模型的动态权重 - EMA 累计历史权重版"""
+
     def __init__(self, recorder: EnsemblePredictionRecorder):
         self.recorder = recorder
-    
+
+    def _get_ewma_history(self, lottery_type: str, model_name: str) -> List[float]:
+        """获取指定模型的 EWMA 历史序列（从 model_weights.json 读取）"""
+        try:
+            with open('model_weights.json', 'r', encoding='utf-8') as f:
+                all_weights = json.load(f)
+            if lottery_type in all_weights:
+                models = all_weights[lottery_type].get('models', {})
+                if model_name in models:
+                    ewma_hist = models[model_name].get('ewma_history', [])
+                    if ewma_hist:
+                        return ewma_hist
+        except:
+            pass
+        return []
+
+    def _save_ewma_history(self, lottery_type: str, model_name: str, ewma_history: List[float]):
+        """保存 EWMA 历史序列到 model_weights.json"""
+        try:
+            with open('model_weights.json', 'r', encoding='utf-8') as f:
+                all_weights = json.load(f)
+        except:
+            all_weights = {}
+
+        if lottery_type not in all_weights:
+            all_weights[lottery_type] = {'models': {}}
+        if 'models' not in all_weights[lottery_type]:
+            all_weights[lottery_type]['models'] = {}
+        if model_name not in all_weights[lottery_type]['models']:
+            all_weights[lottery_type]['models'][model_name] = {}
+
+        all_weights[lottery_type]['models'][model_name]['ewma_history'] = ewma_history[-EMA_WINDOW:]
+        with open('model_weights.json', 'w', encoding='utf-8') as f:
+            json.dump(all_weights, f, ensure_ascii=False, indent=2)
+
     def compute_weights(self, lottery_type: str) -> Dict[str, Dict]:
-        """计算指定彩票类型的模型权重"""
+        """计算指定彩票类型的模型权重
+
+        算法：
+        1. 获取每个模型的历史命中序列
+        2. 计算每期的综合得分（超额命中率 + 连续命中加成 + 趋势加成 + 加速因子）
+        3. 用 EWMA 平滑（alpha=0.3），从头开始累计历史（重新计算，不依赖旧存储）
+        4. 保存 EWMA 历史到 model_weights.json
+        5. 最近 EMA_WINDOW 次的 EWMA 做加权平均（decay=0.9）
+        6. Softmax 归一化得到最终权重
+        """
         models = ['gbdt', 'lightgbm', 'random_forest', 'xgboost', 'catboost']
         baseline = random_baseline(lottery_type)
         red_pick = baseline['red_pick']
         blue_pick = baseline['blue_pick']
-        
+
         stats = {}
         recent_avgs = []
-        
+
         for model_name in models:
             hit_history = self.recorder.get_model_hit_history(lottery_type, model_name)
             n = len(hit_history)
-            
-            # 计算综合得分
-            score = compute_model_score(hit_history, red_pick, blue_pick, baseline)
-            
-            # EWMA平滑
-            ewma = compute_ewma([score])
-            
+
+            # 计算每期的综合得分序列
+            scores = []
+            for i in range(n):
+                period_history = hit_history[:i+1]
+                score = compute_model_score(period_history, red_pick, blue_pick, baseline)
+                scores.append(score)
+
+            # 从头重新计算 EWMA（避免旧历史累积错误）
+            ewma_history = []
+            for score in scores:
+                if ewma_history:
+                    new_ewma = ALPHA * score + (1 - ALPHA) * ewma_history[-1]
+                else:
+                    new_ewma = score
+                ewma_history.append(new_ewma)
+
+            # 保存 EWMA 历史
+            self._save_ewma_history(lottery_type, model_name, ewma_history)
+
             # 样本不足时收缩
+            current_ewma = ewma_history[-1] if ewma_history else 0.0
             if 0 < n < MIN_SAMPLES:
-                ewma *= n / MIN_SAMPLES
-            
-            # 最近10次加权平均
-            recent_avg = compute_recent_weighted_avg([ewma])
-            
+                current_ewma *= n / MIN_SAMPLES
+
+            # 最近 EMA_WINDOW 次的 EWMA 做加权平均
+            recent_avg = compute_recent_weighted_avg(ewma_history, EMA_WINDOW, DECAY_FACTOR)
+
             stats[model_name] = {
                 'samples': n,
-                'score': round(score, 5),
-                'ewma': round(ewma, 5),
+                'score': round(scores[-1], 5) if scores else 0.0,
+                'ewma': round(current_ewma, 5),
+                'ewma_history': ewma_history[-EMA_WINDOW:],
                 'recent_avg': round(recent_avg, 5),
                 'hit_history': hit_history[-RECENT_WINDOW:]
             }
             recent_avgs.append(recent_avg)
-        
-        # Softmax归一化
+
+        # Softmax 归一化
         weights = softmax(recent_avgs, TAU)
-        
+
         result = {
             'lottery_type': lottery_type,
             'updated_at': time.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -338,11 +440,11 @@ class EnsembleWeightCalculator:
             'weights': {m: round(w, 4) for m, w in zip(models, weights)},
             'recommended_model': max(models, key=lambda m: stats[m]['recent_avg'])
         }
-        
+
         return result
-    
+
     def save_weights(self, lottery_type: str, weights: Dict):
-        """保存权重到model_weights.json"""
+        """保存权重到 model_weights.json"""
         file_path = 'model_weights.json'
         all_weights = {}
         if os.path.exists(file_path):
@@ -351,7 +453,7 @@ class EnsembleWeightCalculator:
                     all_weights = json.load(f)
             except:
                 pass
-        
+
         all_weights[lottery_type] = weights
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(all_weights, f, ensure_ascii=False, indent=2)
